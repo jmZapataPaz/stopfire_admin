@@ -1,9 +1,12 @@
-import { createRouter, createWebHistory, type RouteLocationNormalized, type NavigationGuardNext } from 'vue-router';
+import { createRouter, createWebHistory } from 'vue-router';
 import LoginView from '../presentation/views/LoginView.vue';
-import AdminLayout from '../presentation/views/AdminLayout.vue';
-import BomberosView from '../presentation/views/BomberosView.vue';
-import UsuariosView from '../presentation/views/UsuariosView.vue';
-import EstacionesView from '../presentation/views/EstacionesView.vue';
+import WelcomeView from '../presentation/views/WelcomeView.vue';
+import AdminLayout from '../presentation/views/admin/AdminLayout.vue';
+import EstacionesView from '../presentation/views/admin/EstacionesView.vue';
+import UsuariosView from '../presentation/views/admin/UsuariosView.vue';
+import BomberosView from '../presentation/views/admin/BomberosView.vue';
+import BomberoLayout from '../presentation/views/bomberos/BomberoLayout.vue';
+import BomberoMapView from '../presentation/views/bomberos/BomberoMapView.vue';
 
 function getCookie(name: string): string | null {
   const value = `; ${document.cookie}`;
@@ -12,27 +15,55 @@ function getCookie(name: string): string | null {
   return null;
 }
 
+function decodeJwt(t: string): any {
+  try { return JSON.parse(atob(t.split('.')[1])) } catch { return {} }
+}
+
+const routes = [
+  { path: '/login', name: 'login', component: LoginView },
+  { path: '/', name: 'welcome', component: WelcomeView },
+  {
+    path: '/admin',
+    component: AdminLayout,
+    meta: { role: 1 },
+    children: [
+      { path: 'estaciones', name: 'admin-estaciones', component: EstacionesView },
+      { path: 'usuarios', name: 'admin-usuarios', component: UsuariosView },
+      { path: 'bomberos', name: 'admin-bomberos', component: BomberosView }
+    ]
+  },
+  {
+    path: '/bombero',
+    component: BomberoLayout,
+    meta: { role: 2 },
+    children: [
+      { path: 'mapa', name: 'bombero-mapa', component: BomberoMapView }
+    ]
+  }
+]
+
 const router = createRouter({
   history: createWebHistory(),
-  routes: [
-    { path: '/', name: 'login', component: LoginView },
-    {
-      path: '/admin',
-      component: AdminLayout,
-      children: [
-        { path: '', redirect: { name: 'admin-bomberos' } },
-        { path: 'usuarios', name: 'admin-usuarios', component: UsuariosView },
-        { path: 'bomberos', name: 'admin-bomberos', component: BomberosView },
-        { path: 'estaciones', name: 'admin-estaciones', component: EstacionesView },
-      ],
-    },
-  ],
-});
+  routes
+})
 
-router.beforeEach((to: RouteLocationNormalized, _from: RouteLocationNormalized, next: NavigationGuardNext) => {
-  const csrftoken = getCookie('csrftoken');
-  if (!csrftoken && to.name !== 'login') next({ name: 'login' });
-  else next();
-});
+router.beforeEach((to, _from, next) => {
+  if (to.name === 'login') return next()
+  const token = getCookie('csrftoken')
+  if (!token) return next({ name: 'login' })
+  const payload = decodeJwt(token)
+  const role = Number(payload.role_id || payload.rol_id || payload.roleId || payload.rolId)
+  if (![1, 2].includes(role)) {
+    document.cookie = 'csrftoken=; Max-Age=0; Path=/'
+    return next({ name: 'login' })
+  }
+  if (to.path.startsWith('/admin') && role !== 1) {
+    return next({ name: 'bombero-mapa' })
+  }
+  if (to.path.startsWith('/bombero') && role !== 2) {
+    return next({ name: 'admin-estaciones' })
+  }
+  next()
+})
 
-export default router;
+export default router

@@ -38,7 +38,7 @@
 <script lang="ts" setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import '../../assets/AdminLayout.css';
+import '../../../assets/AdminLayout.css';
 
 const router = useRouter();
 const isOpen = ref(false);

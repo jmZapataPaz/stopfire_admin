@@ -59,7 +59,7 @@
 </template>
 
 <script lang="ts" setup>
-import '../../assets/EstacionesView.css'
+import '../../../assets/EstacionesView.css'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet-draw/dist/leaflet.draw.css'
 import * as L from 'leaflet'
@@ -68,9 +68,9 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { ref, onMounted } from 'vue'
-import { getEstaciones, crearEstacion, updateEstacion, deleteEstacion } from '../../infraestructure/estacionService'
-import { getBomberos, type Bombero } from '../../infraestructure/bomberoService'
-import type { Estacion } from '../../domain/estacion'
+import { getEstaciones, crearEstacion, updateEstacion, deleteEstacion } from '../../../infraestructure/estacionService'
+import { getBomberos, type Bombero } from '../../../infraestructure/bomberoService'
+import type { Estacion } from '../../../domain/estacion'
 
 const mapEl = ref<HTMLDivElement | null>(null)
 const map = ref<L.Map | null>(null)
@@ -117,6 +117,11 @@ const form = ref({
 const coberturaGeoJson = ref<any | null>(null)
 
 const polygonStyle: L.PathOptions = { color: '#1d4ed8', weight: 2, fillColor: '#60a5fa', fillOpacity: 0.25 }
+function colorForOwner(id: any) {
+  const n = Number(id || 0)
+  const h = (n * 47) % 360
+  return `hsl(${h} 70% 45%)`
+}
 
 function normalizeGeometry(input: any): any {
   if (!input) return null
@@ -383,7 +388,10 @@ function dibujarEstaciones() {
       L.marker([lat, lng], { icon: pinIcon }).addTo(group as any)
     }
     const geom = normalizeGeometry(e.cobertura ?? e.coberturaGeoJson)
-    if (geom) (L.geoJSON(geom as any, { style: polygonStyle }) as any).addTo(group as any)
+    if (geom) {
+      const c = colorForOwner(e.idUsuario)
+      ;(L.geoJSON(geom as any, { style: { ...polygonStyle, color: c, fillColor: c } }) as any).addTo(group as any)
+    }
     group.addTo(estacionesLayer.value as any)
     stationLayers.value.set(e.id, group)
   })

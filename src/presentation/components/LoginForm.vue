@@ -4,7 +4,7 @@
       <h2>Iniciar Sesión</h2>
       <input v-model="correo" type="email" placeholder="Correo" required />
       <input v-model="contrasena" type="password" placeholder="Contraseña" required />
-      <button type="submit">Entrar</button>
+      <button @click="onSubmit" type="submit">Ingresar</button>
       <p v-if="error" class="error">{{ error }}</p>
     </form>
   </div>
@@ -14,22 +14,38 @@
 import '../../assets/LoginForm.css'; 
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { loginUser } from '../../application/loginUseCase';
+import { login, getRoleFromToken, decodeJwt } from '../../infraestructure/authService';
 
 const correo = ref('');
 const contrasena = ref('');
+const loading = ref(false);
 const error = ref('');
 const router = useRouter();
 
+function clearToken() {
+  document.cookie = 'csrftoken=; Max-Age=0; Path=/';
+}
+
 async function onSubmit() {
   error.value = '';
+  loading.value = true;
   try {
-    const { token } = await loginUser(correo.value, contrasena.value);
-    const isHttps = window.location.protocol === 'https:';
-    document.cookie = `csrftoken=${token}; Path=/; ${isHttps ? 'SameSite=Strict; Secure' : 'SameSite=Lax'}`;
-    router.push({ name: 'admin-bomberos' }); 
+    const resp = await login(correo.value.trim(), contrasena.value);
+    const token = resp.token;
+    if (!token) throw new Error('Token no recibido');
+    const role = getRoleFromToken(token);
+    if (role === 1) {
+      router.push({ name: 'admin-estaciones' });
+    } else if (role === 2) {
+      router.push({ name: 'bombero-mapa' });
+    } else {
+      clearToken();
+      error.value = 'Rol no autorizado';
+    }
   } catch (e: any) {
-    error.value = e.message;
+    error.value = (e?.message || 'Error').slice(0, 250);
+  } finally {
+    loading.value = false;
   }
 }
 </script>
