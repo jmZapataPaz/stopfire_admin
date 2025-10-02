@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-layout">
+  <div class="bombero-layout">
     <aside class="sidebar" :class="{ 'is-open': isOpen }">
       <div class="topbar">
         <button class="hamburger-btn" @click="toggleSidebar"><span></span><span></span><span></span></button>
@@ -17,16 +17,25 @@
     </aside>
     <main class="content">
       <RouterView />
+      <ReporteNotification />
     </main>
   </div>
 </template>
-<script lang="ts" setup>
+
+<script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import '../../../assets/AdminLayout.css'
+import '../../../assets/BomberoLayout.css'
+import ReporteNotification from '../../components/ReporteNotification.vue'
+
 const router = useRouter()
 const isOpen = ref(false)
 function toggleSidebar() { isOpen.value = !isOpen.value }
 function deleteCookie(name: string) { document.cookie = `${name}=; Max-Age=0; Path=/` }
 function logout() { deleteCookie('csrftoken'); router.push({ name: 'login' }) }
 </script>
+
+<style scoped>
+/* ...existing code... */
+</style>

@@ -43,8 +43,17 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
-  routes
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes: [
+    ...routes,
+    {
+      path: '/mapa',
+      name: 'MapaBombero',
+      component: BomberoMapView,
+    },
+    // fallback opcional:
+    { path: '/:pathMatch(.*)*', redirect: '/' }
+  ]
 })
 
 router.beforeEach((to, _from, next) => {

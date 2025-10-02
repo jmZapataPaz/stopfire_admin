@@ -4,17 +4,20 @@
       <h2>Iniciar Sesión</h2>
       <input v-model="correo" type="email" placeholder="Correo" required />
       <input v-model="contrasena" type="password" placeholder="Contraseña" required />
-      <button @click="onSubmit" type="submit">Ingresar</button>
+      <button :disabled="loading" type="submit">
+        {{ loading ? 'Ingresando...' : 'Ingresar' }}
+      </button>
       <p v-if="error" class="error">{{ error }}</p>
     </form>
   </div>
 </template>
 
 <script lang="ts" setup>
-import '../../assets/LoginForm.css'; 
+import '../../assets/LoginForm.css';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { login, getRoleFromToken, decodeJwt } from '../../infraestructure/authService';
+import { getRoleFromToken } from '../../infraestructure/authService';
+import { loginUser } from '../../application/loginUseCase';
 
 const correo = ref('');
 const contrasena = ref('');
@@ -27,22 +30,28 @@ function clearToken() {
 }
 
 async function onSubmit() {
+  if (loading.value) return;
   error.value = '';
   loading.value = true;
   try {
-    const resp = await login(correo.value.trim(), contrasena.value);
-    const token = resp.token;
+    console.log('[Login] Iniciando...');
+    const { token, user } = await loginUser(correo.value.trim(), contrasena.value);
     if (!token) throw new Error('Token no recibido');
-    const role = getRoleFromToken(token);
-    if (role === 1) {
+    const rolTexto = (user as any)?.rol || (user as any)?.Rol || '';
+    console.log('[Login] Rol texto:', rolTexto);
+    const roleNum = getRoleFromToken(token);
+    console.log('[Login] roleNum=', roleNum);
+
+    if (roleNum === 1 || rolTexto.toUpperCase() === 'ADMIN') {
       router.push({ name: 'admin-estaciones' });
-    } else if (role === 2) {
+    } else if (roleNum === 2 || ['BOMBERO','RESPONSABLE'].includes(rolTexto.toUpperCase())) {
       router.push({ name: 'bombero-mapa' });
     } else {
       clearToken();
       error.value = 'Rol no autorizado';
     }
   } catch (e: any) {
+    console.error('[Login] Error', e);
     error.value = (e?.message || 'Error').slice(0, 250);
   } finally {
     loading.value = false;

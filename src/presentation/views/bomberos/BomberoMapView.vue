@@ -8,7 +8,7 @@
 <script lang="ts" setup>
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, onBeforeUnmount } from 'vue'
 import type { Estacion } from '../../../domain/estacion'
 import { getEstacionesBombero } from '../../../infraestructure/estacionBomberoService'
 import '../../../assets/BomberoMapView.css'
@@ -114,8 +114,26 @@ function initMap() {
   estacionesLayer.value = L.featureGroup().addTo(mapRef.value)
 }
 
+function centrarReporte(r: any) {
+  if (!mapRef.value) return;
+  const lat = Number(r.latitud), lng = Number(r.longitud);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    L.marker([lat, lng], { icon: defaultIcon }).addTo(mapRef.value);
+    mapRef.value.setView([lat, lng], 16);
+  }
+}
+
+function onReporteAceptado(ev: any) {
+  centrarReporte(ev.detail);
+}
+
 onMounted(async () => {
-  initMap()
-  await cargar()
-})
+  window.addEventListener('reporte-aceptado', onReporteAceptado);
+  initMap();
+  await cargar();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('reporte-aceptado', onReporteAceptado);
+});
 </script>
