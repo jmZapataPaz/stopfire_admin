@@ -51,8 +51,8 @@ async function aceptarActual() {
   if (!id) return;
   state.loadingAccion = true;
   try {
-    console.log('[Aceptar] POST', `${API_BASE}/api/Usuarios/reportes/${id}/aceptar`);
-    await fetch(`${API_BASE}/api/Usuarios/reportes/${id}/aceptar`, {
+    console.log('[Aceptar] POST', `${API_BASE}/api/bombero/reportes/${id}/aceptar`);
+    await fetch(`${API_BASE}/api/bombero/reportes/${id}/aceptar`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${getToken()}` }
     });
@@ -72,8 +72,8 @@ async function rechazarActual() {
   if (!id) return;
   state.loadingAccion = true;
   try {
-    console.log('[Rechazar] POST', `${API_BASE}/api/Usuarios/reportes/${id}/rechazar`);
-    await fetch(`${API_BASE}/api/Usuarios/reportes/${id}/rechazar`, {
+    console.log('[Rechazar] POST', `${API_BASE}/api/bombero/reportes/${id}/rechazar`);
+    await fetch(`${API_BASE}/api/Usuarios/bombero/${id}/rechazar`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${getToken()}` }
     });
