@@ -2,6 +2,13 @@
   <div class="bombero-map">
     <div id="bombero-map"></div>
     <p v-if="error" class="error">{{ error }}</p>
+    <ReporteDetalleModal
+      v-if="detalleVisible && detalleActual"
+      :token="token"
+      :reporte="detalleActual"
+      @close="cerrarDetalle"
+      @mitigado="onMitigado"
+    />
   </div>
 </template>
 
@@ -10,8 +17,12 @@ import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { onMounted, ref, onBeforeUnmount } from 'vue'
 import type { Estacion } from '../../../domain/estacion'
+import type { Reporte } from '../../../domain/reporte'
 import { getEstacionesBombero } from '../../../infraestructure/estacionBomberoService'
+import { getReportes } from '../../../infraestructure/reporteService'
 import '../../../assets/BomberoMapView.css'
+import '../../../assets/ReporteDetalleModal.css'
+import ReporteDetalleModal from '../../components/ReporteDetalleModal.vue'
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
@@ -28,7 +39,9 @@ const defaultIcon = L.icon({
 
 const mapRef = ref<L.Map | null>(null)
 const estacionesLayer = ref<L.FeatureGroup | null>(null)
+const reportesLayer = ref<L.FeatureGroup | null>(null)
 const estaciones = ref<Estacion[]>([])
+const reportesAceptados = ref<Reporte[]>([])
 const error = ref('')
 
 function getCookie(name: string): string | null {
@@ -60,6 +73,18 @@ async function cargar() {
     dibujar()
   } catch (e: any) {
     error.value = (e.message || 'Error').slice(0, 160)
+  }
+}
+async function cargarReportesAceptados() {
+  try {
+    const todos = await getReportes(token)
+    reportesAceptados.value = todos.filter(r =>
+      (r.estado ?? '').toUpperCase() === 'ACEPTADO' &&
+      Number.isFinite(r.latitud) && Number.isFinite(r.longitud)
+    )
+    dibujarReportes()
+  } catch (e: any) {
+    console.warn('[Reportes] carga falló:', e?.message || e)
   }
 }
 
@@ -100,6 +125,26 @@ function dibujar() {
     if (b.isValid()) mapRef.value.fitBounds(b, { padding: [30, 30] })
   }
 }
+function dibujarReportes() {
+  if (!mapRef.value || !reportesLayer.value) return
+  reportesLayer.value.clearLayers()
+
+  const icon = L.divIcon({
+    className: 'sf-warning-marker',
+    html: '⚠️',
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  })
+
+  for (const r of reportesAceptados.value) {
+    const lat = Number(r.latitud), lng = Number(r.longitud)
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      const m = L.marker([lat, lng], { icon, interactive: true })
+      m.on('click', () => abrirDetalle(r))
+      m.addTo(reportesLayer.value)
+    }
+  }
+}
 
 function initMap() {
   const el = document.getElementById('bombero-map')
@@ -112,6 +157,8 @@ function initMap() {
     attribution: '© OpenStreetMap'
   }).addTo(mapRef.value)
   estacionesLayer.value = L.featureGroup().addTo(mapRef.value)
+  // NUEVO: grupo de reportes aceptados por encima
+  reportesLayer.value = L.featureGroup().addTo(mapRef.value)
 }
 
 function centrarReporte(r: any) {
@@ -125,12 +172,44 @@ function centrarReporte(r: any) {
 
 function onReporteAceptado(ev: any) {
   centrarReporte(ev.detail);
+
+  const r = ev?.detail
+  if (r && Number.isFinite(Number(r.latitud)) && Number.isFinite(Number(r.longitud))) {
+    const nuevo: Reporte = {
+      id: r.id ?? r.Id ?? Date.now(),
+      descripcion: r.descripcion ?? r.Descripcion,
+      fotoUrl: r.fotoUrl ?? r.FotoUrl,
+      latitud: Number(r.latitud ?? r.Latitud),
+      longitud: Number(r.longitud ?? r.Longitud),
+      estado: (r.estado ?? r.Estado) || 'ACEPTADO',
+      fechaCreacion: r.fechaCreacion ?? r.FechaCreacion,
+    }
+    reportesAceptados.value.push(nuevo)
+    dibujarReportes()
+  }
+}
+const detalleVisible = ref(false)
+const detalleActual = ref<Reporte | null>(null)
+
+function abrirDetalle(r: Reporte) {
+  detalleActual.value = r
+  detalleVisible.value = true
+}
+function cerrarDetalle() {
+  detalleVisible.value = false
+  detalleActual.value = null
+}
+function onMitigado(id: number) {
+  reportesAceptados.value = reportesAceptados.value.filter(r => r.id !== id)
+  dibujarReportes()
+  cerrarDetalle()
 }
 
 onMounted(async () => {
   window.addEventListener('reporte-aceptado', onReporteAceptado);
   initMap();
   await cargar();
+  await cargarReportesAceptados();
 });
 
 onBeforeUnmount(() => {

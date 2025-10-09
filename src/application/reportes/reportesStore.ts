@@ -73,7 +73,7 @@ async function rechazarActual() {
   state.loadingAccion = true;
   try {
     console.log('[Rechazar] POST', `${API_BASE}/api/bombero/reportes/${id}/rechazar`);
-    await fetch(`${API_BASE}/api/Usuarios/bombero/${id}/rechazar`, {
+    await fetch(`${API_BASE}/api/bombero/reportes/${id}/rechazar`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${getToken()}` }
     });

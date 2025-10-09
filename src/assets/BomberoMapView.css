@@ -28,3 +28,11 @@
 .leaflet-container img {
   max-width: none !important;
 }
+
+.sf-warning-marker {
+  font-size: 22px;
+  line-height: 22px;
+  pointer-events: none; 
+  transform: translate(-11px, -11px); 
+  text-shadow: 0 0 2px rgba(0,0,0,.35);
+}
