@@ -157,7 +157,6 @@ function initMap() {
     attribution: '© OpenStreetMap'
   }).addTo(mapRef.value)
   estacionesLayer.value = L.featureGroup().addTo(mapRef.value)
-  // NUEVO: grupo de reportes aceptados por encima
   reportesLayer.value = L.featureGroup().addTo(mapRef.value)
 }
 

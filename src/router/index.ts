@@ -5,8 +5,8 @@ import AdminLayout from '../presentation/views/admin/AdminLayout.vue';
 import EstacionesView from '../presentation/views/admin/EstacionesView.vue';
 import UsuariosView from '../presentation/views/admin/UsuariosView.vue';
 import BomberosView from '../presentation/views/admin/BomberosView.vue';
-import BomberoLayout from '../presentation/views/bomberos/BomberoLayout.vue';
 import BomberoMapView from '../presentation/views/bomberos/BomberoMapView.vue';
+import BomberoHistorialView from '../presentation/views/bomberos/BomberoHistorialView.vue';
 
 function getCookie(name: string): string | null {
   const value = `; ${document.cookie}`;
@@ -34,10 +34,11 @@ const routes = [
   },
   {
     path: '/bombero',
-    component: BomberoLayout,
+    component: () => import('../presentation/views/bomberos/BomberoLayout.vue'),
     meta: { role: 2 },
     children: [
-      { path: 'mapa', name: 'bombero-mapa', component: BomberoMapView }
+      { path: 'mapa', name: 'bombero-mapa', component: BomberoMapView },
+      { path: 'historial', component: BomberoHistorialView },
     ]
   }
 ]
@@ -51,7 +52,6 @@ const router = createRouter({
       name: 'MapaBombero',
       component: BomberoMapView,
     },
-    // fallback opcional:
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

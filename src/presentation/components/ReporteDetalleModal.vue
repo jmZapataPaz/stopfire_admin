@@ -23,7 +23,7 @@
           <span>{{ reporte.fechaCreacion }}</span>
         </div>
         <div v-if="reporte.fotoUrl" class="sf-modal__img">
-          <img :src="reporte.fotoUrl" alt="Evidencia" />
+          <img :src="reporte.fotoUrl" alt="Evidencia" class="rdm-thumb"/>
         </div>
         <p v-if="error" class="sf-error">{{ error }}</p>
       </section>

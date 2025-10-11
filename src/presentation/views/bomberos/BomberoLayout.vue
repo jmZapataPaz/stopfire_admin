@@ -10,6 +10,10 @@
           <span class="icon">🗺</span>
           <span class="label">Mapa</span>
         </RouterLink>
+        <RouterLink class="nav-link" to="/bombero/historial">
+          <span class="icon">📜</span>
+          <span class="label">Historial</span>
+        </RouterLink>
       </nav>
       <button class="logout" @click="logout">
         <span class="icon">↩</span><span class="label">Cerrar sesión</span>

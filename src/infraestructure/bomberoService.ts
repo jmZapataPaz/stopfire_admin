@@ -1,3 +1,15 @@
+import type { BomberoHistorialItem } from '../domain/bomberoHistorial';
+
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5190').replace(/\/+$/, '');
+
+function absolutize(u?: any): string | undefined {
+  if (!u) return undefined;
+  try { return new URL(String(u)).toString(); } catch {}
+  const s = String(u);
+  if (s.startsWith('/')) return `${API_BASE}${s}`;
+  return `${API_BASE}/${s}`;
+}
+
 export interface Bombero {
   id: number;
   nombre: string;
@@ -60,4 +72,33 @@ export async function deleteBombero(id: number, token: string) {
   });
   if (!res.ok) throw new Error('Error al eliminar bombero');
   return true;
+}
+
+export async function getHistorialAceptadosPorEstacion(token: string, idEstacion: number): Promise<BomberoHistorialItem[]> {
+  const res = await fetch(`${API_BASE}/api/Bombero/estaciones/${idEstacion}/historial-aceptados`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Historial ${res.status}: ${txt}`);
+  }
+  const data = await res.json();
+  if (!Array.isArray(data)) return [];
+  return data.map((r: any) => ({
+    idReporte: r.idReporte ?? r.IdReporte,
+    idAsignacion: r.idAsignacion ?? r.IdAsignacion,
+    idEstacion: r.idEstacion ?? r.IdEstacion,
+    descripcion: r.descripcion ?? r.Descripcion,
+    nombreCompleto: r.nombreCompleto ?? r.NombreCompleto,
+    ci: r.ci ?? r.Ci,
+    celular: r.celular ?? r.Celular,
+    latitud: Number(r.latitud ?? r.Latitud),
+    longitud: Number(r.longitud ?? r.Longitud),
+    fotoUrl: r.fotoUrl ?? r.FotoUrl,
+    fechaCreacion: (r.fechaCreacion ?? r.FechaCreacion)?.toString(),
+  })) as BomberoHistorialItem[];
 }

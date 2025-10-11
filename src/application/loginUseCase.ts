@@ -25,7 +25,7 @@ export async function loginUser(correo: string, contrasena: string): Promise<{ t
   }
 
   if (shouldInitSignalR) {
-    localStorage.setItem('authToken', token); // <-- agrega esto
+    localStorage.setItem('authToken', token);
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5190';
     console.log('[Auth] Iniciando SignalR baseUrl=', baseUrl, 'rolCanonico=', rolCanonico);
     initNotificaciones(baseUrl, token);
