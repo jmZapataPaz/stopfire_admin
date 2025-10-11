@@ -164,8 +164,7 @@ function centrarReporte(r: any) {
   if (!mapRef.value) return;
   const lat = Number(r.latitud), lng = Number(r.longitud);
   if (Number.isFinite(lat) && Number.isFinite(lng)) {
-    L.marker([lat, lng], { icon: defaultIcon }).addTo(mapRef.value);
-    mapRef.value.setView([lat, lng], 16);
+    mapRef.value.setView([lat, lng], Math.max(mapRef.value.getZoom(), 16));
   }
 }
 
@@ -174,8 +173,9 @@ function onReporteAceptado(ev: any) {
 
   const r = ev?.detail
   if (r && Number.isFinite(Number(r.latitud)) && Number.isFinite(Number(r.longitud))) {
+    const nuevoId = (r.id ?? r.Id) ?? Date.now();
     const nuevo: Reporte = {
-      id: r.id ?? r.Id ?? Date.now(),
+      id: Number(nuevoId),
       descripcion: r.descripcion ?? r.Descripcion,
       fotoUrl: r.fotoUrl ?? r.FotoUrl,
       latitud: Number(r.latitud ?? r.Latitud),
@@ -183,7 +183,10 @@ function onReporteAceptado(ev: any) {
       estado: (r.estado ?? r.Estado) || 'ACEPTADO',
       fechaCreacion: r.fechaCreacion ?? r.FechaCreacion,
     }
-    reportesAceptados.value.push(nuevo)
+    const idx = reportesAceptados.value.findIndex(x => x.id === nuevo.id);
+    if (idx >= 0) reportesAceptados.value[idx] = nuevo;
+    else reportesAceptados.value.push(nuevo);
+
     dibujarReportes()
   }
 }
@@ -209,6 +212,19 @@ onMounted(async () => {
   initMap();
   await cargar();
   await cargarReportesAceptados();
+
+  try {
+    const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5190').replace(/\/+$/,'');
+    const mod: any = await import('../../../infraestructure/signalr/notificacionesHub');
+    const hub: any = mod.default?.instance ?? mod.default ?? mod.instance ?? mod;
+    const fn = hub.ensureConnected ?? hub.connect ?? hub.EnsureConnected;
+    if (typeof fn === 'function') {
+      if (fn.length >= 2) await fn(API_BASE, token);
+      else await fn({ baseUrl: API_BASE, token });
+    }
+  } catch (e) {
+    console.warn('[MAP] No se pudo reconectar al hub existente:', e);
+  }
 });
 
 onBeforeUnmount(() => {
