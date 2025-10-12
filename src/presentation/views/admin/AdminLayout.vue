@@ -39,6 +39,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import '../../../assets/AdminLayout.css';
+import { stopConnection } from '../../../infraestructure/signalr/notificacionesHub'; // NUEVO
 
 const router = useRouter();
 const isOpen = ref(false);
@@ -50,7 +51,8 @@ function toggleSidebar() {
 function deleteCookie(name: string) {
   document.cookie = `${name}=; Max-Age=0; Path=/`;
 }
-function logout() {
+async function logout() {
+  try { await stopConnection(); } catch {}
   deleteCookie('csrftoken');
   router.push({ name: 'login' });
 }

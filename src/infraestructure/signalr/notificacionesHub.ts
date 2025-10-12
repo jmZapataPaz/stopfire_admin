@@ -7,8 +7,29 @@ export function getNotificacionesConnection() {
   return connection;
 }
 
-export function isNotificacionesConnected() {
-  return connection?.state === signalR.HubConnectionState.Connected;
+export function isNotificacionesConnected(): boolean {
+  return !!connection && connection.state === signalR.HubConnectionState.Connected;
+}
+export async function stopConnection(): Promise<void> {
+  if (!connection) return;
+  try {
+    try {
+      connection.off('ReporteCreado');
+      connection.off('ReporteAsignado');
+      connection.off('AsignacionCreada');
+      connection.off('ReporteEstado');
+      connection.off('AsignacionEstado');
+      connection.off('ReporteMitigado');
+      connection.off('AsignacionMitigada');
+      connection.off('ReporteActualizado');
+      connection.off('AsignacionActualizada');
+    } catch {}
+    await connection.stop();
+  } catch (e) {
+    console.warn('[SignalR] stopConnection error:', e);
+  } finally {
+    connection = null;
+  }
 }
 
 export function initNotificaciones(baseUrl: string, token: string) {
@@ -95,4 +116,44 @@ function normalizarReporte(raw: any) {
     creadoEn: raw.creadoEn ?? raw.CreadoEn ?? raw.fecha ?? raw.createdAt,
     estado: raw.estado ?? raw.Estado
   };
+}
+
+function isBomberoToken(token: string | null | undefined): boolean {
+  if (!token) return false;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    const v = payload.rol_id ?? payload.role_id ?? payload.rolId ?? payload.roleId ?? payload.rol ?? payload.role;
+    if (typeof v === 'number') return v === 2;
+    const s = String(v).toUpperCase();
+    if (s === '2') return true;
+    return s.includes('BOMBERO');
+  } catch {
+    return false;
+  }
+}
+
+let _lastToken: string | null = null;
+
+export async function ensureConnected(baseUrl: string, token: string) {
+  _lastToken = token;
+  if (!isBomberoToken(token)) {
+    try { await stop(); } catch {}
+    return; 
+  }
+}
+export async function start(baseUrl: string, token: string) {
+  _lastToken = token;
+  if (!isBomberoToken(token)) {
+    try { await stop(); } catch {}
+    return; 
+  }
+}
+
+export async function stop() {
+  if (connection) {
+    await connection.stop();
+  }
+  _lastToken = null;
 }

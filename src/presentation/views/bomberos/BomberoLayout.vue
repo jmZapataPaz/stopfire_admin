@@ -36,13 +36,17 @@ import { useRouter } from 'vue-router'
 import '../../../assets/AdminLayout.css'
 import '../../../assets/BomberoLayout.css'
 import ReporteNotification from '../../components/ReporteNotification.vue'
-import { ensureNotificaciones, isNotificacionesConnected } from '../../../infraestructure/signalr/notificacionesHub'
+import { ensureNotificaciones, isNotificacionesConnected, stopConnection } from '../../../infraestructure/signalr/notificacionesHub'
 
 const router = useRouter()
 const isOpen = ref(false)
 function toggleSidebar() { isOpen.value = !isOpen.value }
 function deleteCookie(name: string) { document.cookie = `${name}=; Max-Age=0; Path=/` }
-function logout() { deleteCookie('csrftoken'); router.push({ name: 'login' }) }
+async function logout() {
+  try { await stopConnection(); } catch {}
+  deleteCookie('csrftoken')
+  router.push({ name: 'login' })
+}
 
 function getCookie(name: string) {
   const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'))
