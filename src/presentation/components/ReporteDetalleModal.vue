@@ -7,20 +7,12 @@
       </header>
       <section class="sf-modal__body">
         <div class="sf-modal__row">
-          <span class="sf-label">ID:</span>
-          <span>{{ reporte.id }}</span>
-        </div>
-        <div class="sf-modal__row">
           <span class="sf-label">Descripción:</span>
           <span>{{ reporte.descripcion || '(sin descripción)' }}</span>
         </div>
-        <div class="sf-modal__row">
-          <span class="sf-label">Ubicación:</span>
-          <span>{{ reporte.latitud }}, {{ reporte.longitud }}</span>
-        </div>
         <div v-if="reporte.fechaCreacion" class="sf-modal__row">
           <span class="sf-label">Fecha:</span>
-          <span>{{ reporte.fechaCreacion }}</span>
+          <span>{{ formatFecha(reporte.fechaCreacion) }}</span>
         </div>
         <div v-if="reporte.fotoUrl" class="sf-modal__img">
           <img :src="reporte.fotoUrl" alt="Evidencia" class="rdm-thumb"/>
@@ -70,5 +62,14 @@ async function onMitigar() {
   } finally {
     loading.value = false;
   }
+}
+
+function formatFecha(input: string | Date): string {
+  if (!input) return ''
+  const dt = new Date(input)
+  if (isNaN(dt.getTime())) return String(input)
+  const fecha = dt.toLocaleDateString('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const hora = dt.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', hour12: false })
+  return `${fecha} ${hora}`
 }
 </script>

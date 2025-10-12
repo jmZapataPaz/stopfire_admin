@@ -51,28 +51,31 @@ export function initNotificaciones(baseUrl: string, token: string) {
 
   connection.on('ReporteCreado', payload => {
     console.log('[SignalR] ReporteCreado recibido', payload);
-    incomingReportesStore.addReporte(normalizarReporte(payload));
+    incomingReportesStore.addReporte(payload);
   });
 
   connection.on('ReporteAsignado', payload => {
     console.log('[SignalR] ReporteAsignado recibido', payload);
-    incomingReportesStore.addReporte(normalizarReporte(payload));
+    incomingReportesStore.addReporte(payload);
   });
 
-  connection.on('ReporteEstado', p => {
-    console.log('[SignalR] ReporteEstado', p);
+  connection.on('ReporteEstado', payload => {
+    console.log('[SignalR] ReporteEstado', payload);
+    if ((payload.estado ?? '').toUpperCase() === 'MITIGADO') {
+      window.dispatchEvent(new CustomEvent('reporte-mitigado', { detail: payload }));
+    }
   });
 
   connection.on('ReporteReasignado', p => {
     console.log('[SignalR] Reasignado', p);
-    incomingReportesStore.addReporte(normalizarReporte(p));
+    incomingReportesStore.addReporte(p);
   });
 
   ['ReporteRechazado', 'reporterechazado'].forEach(evt => {
     connection!.on(evt, p => {
       console.log('[SignalR] Evento rechazo', evt, p);
       if (p && (p.latitud || p.Latitud)) {
-        incomingReportesStore.addReporte(normalizarReporte(p));
+        incomingReportesStore.addReporte(p);
       }
     });
   });
@@ -104,18 +107,6 @@ export async function ensureNotificaciones(baseUrl: string, token: string) {
   initNotificaciones(baseUrl, token);
   await startNotificaciones();
   return connection;
-}
-
-function normalizarReporte(raw: any) {
-  return {
-    id: raw.id ?? raw.Id,
-    descripcion: raw.descripcion ?? raw.Descripcion,
-    latitud: raw.latitud ?? raw.Latitud,
-    longitud: raw.longitud ?? raw.Longitud,
-    imagenUrl: raw.imagenUrl ?? raw.ImagenUrl ?? raw.FotoUrl,
-    creadoEn: raw.creadoEn ?? raw.CreadoEn ?? raw.fecha ?? raw.createdAt,
-    estado: raw.estado ?? raw.Estado
-  };
 }
 
 function isBomberoToken(token: string | null | undefined): boolean {

@@ -209,6 +209,7 @@ function onMitigado(id: number) {
 
 onMounted(async () => {
   window.addEventListener('reporte-aceptado', onReporteAceptado);
+  window.addEventListener('reporte-mitigado', onReporteMitigado);
   initMap();
   await cargar();
   await cargarReportesAceptados();
@@ -229,5 +230,13 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('reporte-aceptado', onReporteAceptado);
+  window.removeEventListener('reporte-mitigado', onReporteMitigado);
 });
+
+function onReporteMitigado(ev: any) {
+  const id = Number(ev?.detail?.id ?? ev?.detail?.Id);
+  if (!id) return;
+  reportesAceptados.value = reportesAceptados.value.filter(r => r.id !== id);
+  dibujarReportes();
+}
 </script>
