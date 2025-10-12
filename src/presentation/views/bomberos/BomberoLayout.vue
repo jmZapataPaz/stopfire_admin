@@ -14,6 +14,10 @@
           <span class="icon">📜</span>
           <span class="label">Historial</span>
         </RouterLink>
+        <RouterLink class="nav-link" to="/bombero/estacion">
+          <span class="icon">🏢</span>
+          <span class="label">Estación</span>
+        </RouterLink>
       </nav>
       <button class="logout" @click="logout">
         <span class="icon">↩</span><span class="label">Cerrar sesión</span>
@@ -57,6 +61,14 @@ onMounted(async () => {
   } catch (e) {
     console.warn('[BomberoLayout] Error conectando SignalR', e)
   }
+
+  requestAnimationFrame(() => {
+    const el = document.querySelector('.sidebar .logout') as HTMLElement | null
+    if (el) {
+      const ff = getComputedStyle(el).fontFamily
+      if (ff) document.documentElement.style.setProperty('--sf-font', ff)
+    }
+  })
 })
 </script>
 

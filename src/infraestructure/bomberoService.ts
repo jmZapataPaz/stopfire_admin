@@ -102,3 +102,66 @@ export async function getHistorialAceptadosPorEstacion(token: string, idEstacion
     fechaCreacion: (r.fechaCreacion ?? r.FechaCreacion)?.toString(),
   })) as BomberoHistorialItem[];
 }
+
+export interface EstacionDetalle {
+  id: number;
+  idUsuario: number;
+  nombre?: string | null;
+  descripcionDireccion?: string | null;
+  celular?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
+  estado: boolean;
+  coberturaWkt?: string | null;
+}
+
+export interface UpdateEstacionBombero {
+  nombre?: string;
+  descripcionDireccion?: string;
+  celular?: string;
+}
+
+export async function getMiEstacionBombero(token: string): Promise<EstacionDetalle> {
+  const res = await fetch(`${API_BASE}/api/Bombero/mi-estacion`, {
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    }
+  });
+  if (!res.ok) throw new Error(`mi-estacion ${res.status}: ${await res.text()}`);
+  const d = await res.json();
+  return {
+    id: d.id ?? d.Id,
+    idUsuario: d.idUsuario ?? d.IdUsuario,
+    nombre: d.nombre ?? d.Nombre,
+    descripcionDireccion: d.descripcionDireccion ?? d.DescripcionDireccion,
+    celular: d.celular ?? d.Celular,
+    latitud: typeof d.latitud === 'number' ? d.latitud : Number(d.Latitud ?? d.latitud),
+    longitud: typeof d.longitud === 'number' ? d.longitud : Number(d.Longitud ?? d.longitud),
+    estado: d.estado ?? d.Estado,
+    coberturaWkt: d.coberturaWkt ?? d.CoberturaWkt,
+  };
+}
+
+// NUEVO: actualizar campos permitidos
+export async function actualizarEstacionBombero(id: number, data: UpdateEstacionBombero, token: string): Promise<EstacionDetalle> {
+  const res = await fetch(`${API_BASE}/api/Bombero/estaciones/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(`PATCH estacion ${res.status}: ${await res.text()}`);
+  const d = await res.json();
+  return {
+    id: d.id ?? d.Id,
+    idUsuario: d.idUsuario ?? d.IdUsuario,
+    nombre: d.nombre ?? d.Nombre,
+    descripcionDireccion: d.descripcionDireccion ?? d.DescripcionDireccion,
+    celular: d.celular ?? d.Celular,
+    estado: true
+  } as EstacionDetalle;
+}

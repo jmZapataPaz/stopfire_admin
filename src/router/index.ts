@@ -7,6 +7,7 @@ import UsuariosView from '../presentation/views/admin/UsuariosView.vue';
 import BomberosView from '../presentation/views/admin/BomberosView.vue';
 import BomberoMapView from '../presentation/views/bomberos/BomberoMapView.vue';
 import BomberoHistorialView from '../presentation/views/bomberos/BomberoHistorialView.vue';
+import BomberoEstacionView from '../presentation/views/bomberos/BomberoEstacionView.vue';
 
 function getCookie(name: string): string | null {
   const value = `; ${document.cookie}`;
@@ -39,6 +40,7 @@ const routes = [
     children: [
       { path: 'mapa', name: 'bombero-mapa', component: BomberoMapView },
       { path: 'historial', component: BomberoHistorialView },
+      { path: 'estacion', component: BomberoEstacionView },
     ]
   }
 ]

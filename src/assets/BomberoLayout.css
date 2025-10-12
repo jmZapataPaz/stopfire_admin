@@ -1,3 +1,20 @@
 .bombero-layout {
   font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
 }
+.bombero-layout h1,
+.bombero-layout h2,
+.bombero-layout h3,
+.bombero-layout h4,
+.bombero-layout h5,
+.bombero-layout h6,
+.bombero-layout p,
+.bombero-layout label,
+.bombero-layout input,
+.bombero-layout textarea,
+.bombero-layout select,
+.bombero-layout button,
+.bombero-layout table,
+.bombero-layout .nav-link,
+.bombero-layout .brand {
+  font-family: inherit;
+}

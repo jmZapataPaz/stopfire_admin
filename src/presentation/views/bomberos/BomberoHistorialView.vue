@@ -12,12 +12,11 @@
       <thead>
         <tr>
           <th>Ciudadano</th><th>CI</th><th>Celular</th>
-          <th>Descripción</th><th>Lat</th><th>Lon</th><th>Fecha</th>
+          <th>Descripción</th><th>Fecha</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="r in items" :key="r.idAsignacion" class="bh-row" @click="openImg(r.fotoUrl)">
-          <td>{{ r.idReporte }}</td>
           <td>{{ r.nombreCompleto || '-' }}</td>
           <td>{{ r.ci || '-' }}</td>
           <td>{{ r.celular || '-' }}</td>
@@ -25,8 +24,6 @@
             <span v-if="r.descripcion && r.descripcion.trim() !== ''">{{ r.descripcion }}</span>
             <span v-else class="bh-desc-empty">no descripción</span>
           </td>
-          <td>{{ r.latitud }}</td>
-          <td>{{ r.longitud }}</td>
           <td>{{ formatFecha(r.fechaCreacion) }}</td>
         </tr>
       </tbody>

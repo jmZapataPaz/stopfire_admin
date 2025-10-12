@@ -1,0 +1,6 @@
+.be-form { background:#fff; border-radius:8px; padding:12px; }
+.be-row { display:grid; grid-template-columns: 180px 1fr; gap:10px; margin-bottom:10px; align-items:center; }
+.be-row input, .be-row textarea { width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; }
+.be-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:6px; color:#555; }
+.be-actions { margin-top:12px; display:flex; gap:10px; }
+.sf-btn--primary { background:#e53935; border:1px solid #e53935; color:#fff; }
