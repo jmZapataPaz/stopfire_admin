@@ -39,6 +39,7 @@ import { onMounted, ref, computed } from 'vue'
 import type { BomberoHistorialItem } from '../../../domain/bomberoHistorial'
 import { getHistorialAceptadosPorEstacion } from '../../../infraestructure/bomberoService'
 import { getClaim } from '../../../utils/jwt'
+import { getMiEstacion } from '../../../infraestructure/estacionBomberoService' // <- NUEVO
 import '../../../assets/BomberoHistorialView.css'
 import '../../../assets/ReporteDetalleModal.css'
 import ImagenModal from '../../components/ImagenModal.vue'
@@ -50,7 +51,8 @@ function getCookie(name: string) {
 const token = getCookie('csrftoken')
 
 const estacionId = ref<number | null>(null)
-const tituloEstacion = computed(() => estacionId.value ? `#${estacionId.value}` : '-')
+const estacionNombre = ref<string>('') 
+const tituloEstacion = computed(() => estacionNombre.value || '-') // <- CAMBIO
 
 const items = ref<BomberoHistorialItem[]>([])
 const loading = ref(false)
@@ -79,6 +81,14 @@ onMounted(async () => {
     return
   }
   estacionId.value = eid
+
+  try {
+    const mi = await getMiEstacion(token)
+    if (mi?.nombre) estacionNombre.value = mi.nombre
+  } catch (e: any) {
+    console.warn('getMiEstacion error:', e?.message || e)
+  }
+
   await reload()
 })
 </script>

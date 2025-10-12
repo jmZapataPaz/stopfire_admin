@@ -56,4 +56,4 @@ async function logout() {
   deleteCookie('csrftoken');
   router.push({ name: 'login' });
 }
-</script>
+</script> 

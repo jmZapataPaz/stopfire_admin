@@ -43,17 +43,7 @@
         </template>
       </div>
 
-      <!-- Datos solo lectura -->
-      <div class="be-grid">
-        <div>
-          <small>Latitud</small>
-          <div>{{ estacion.latitud ?? '-' }}</div>
-        </div>
-        <div>
-          <small>Longitud</small>
-          <div>{{ estacion.longitud ?? '-' }}</div>
-        </div>
-      </div>
+
 
       <div class="be-actions" style="margin-top:10px;">
         <button v-if="!editMode" class="sf-btn" @click="activarEdicion">Actualizar</button>

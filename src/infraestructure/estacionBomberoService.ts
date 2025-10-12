@@ -15,3 +15,19 @@ export async function getEstacionesBombero(token: string): Promise<Estacion[]> {
     coberturaGeoJson: e.cobertura ?? e.coberturaGeoJson
   }))
 }
+
+export async function getMiEstacion(token: string): Promise<Estacion> {
+  const url = `${baseUrl()}/api/Bombero/mi-estacion`; 
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status} ${url} -> ${text}`);
+  }
+  return (await res.json()) as Estacion;
+}
