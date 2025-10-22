@@ -21,7 +21,10 @@
       </section>
       <footer class="sf-modal__footer">
         <button class="sf-btn sf-btn--ghost" @click="onClose" :disabled="loading">Cerrar</button>
-        <button class="sf-btn sf-btn--primary" @click="onMitigar" :disabled="loading">
+        <button v-if="canMitigar"
+                class="sf-btn sf-btn--primary"
+                @click="onMitigar"
+                :disabled="loading">
           <span v-if="loading" class="sf-spinner"></span>
           Mitigar
         </button>
@@ -31,36 +34,89 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import type { Reporte } from '../../domain/reporte';
-import { mitigarReporte } from '../../infraestructure/reporteService';
+import { ref, computed, onMounted } from 'vue'
+import type { Reporte } from '../../domain/reporte'
+import { mitigarReporte } from '../../infraestructure/reporteService'
 
 const props = defineProps<{
   token: string;
   reporte: Reporte;
-}>();
+}>()
 const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'mitigado', id: number): void;
-}>();
+}>()
 
-const loading = ref(false);
-const error = ref('');
+const loading = ref(false)
+const error = ref('')
 
-function onClose() { if (!loading.value) emit('close'); }
+function b64urlToJson(b64: string) {
+  const s = b64.replace(/-/g, '+').replace(/_/g, '/')
+  const pad = '='.repeat((4 - (s.length % 4)) % 4)
+  return JSON.parse(atob(s + pad))
+}
+function getStationIdFromJwt(t: string): number | null {
+  try {
+    const parts = t.split('.'); if (parts.length !== 3) return null
+    const payload = b64urlToJson(parts[1])
+    const v = payload.estacion_id ?? payload.estacionId ?? payload.station_id ?? payload.stationId
+    const n = typeof v === 'number' ? v : Number(v)
+    return Number.isFinite(n) ? n : null
+  } catch { return null }
+}
+function pickInt(o: any, keys: string[]): number | null {
+  for (const k of keys) {
+    const v = o?.[k]; const n = typeof v === 'number' ? v : Number(v)
+    if (Number.isFinite(n)) return n
+  }
+  return null
+}
+function pickStr(o: any, keys: string[]): string | null {
+  for (const k of keys) {
+    const v = o?.[k]; if (typeof v === 'string') return v
+  }
+  return null
+}
+
+const myStationId = ref<number | null>(getStationIdFromJwt(props.token))
+
+// AGREGADO: leer estacionId y estado desde el endpoint de detalle
+const assignedStationId = ref<number | null>(pickInt(props.reporte as any, ['estacionId','EstacionId','idEstacion','IdEstacion']))
+const estadoActual = ref<string>((props.reporte as any)?.estado ?? '')
+
+onMounted(async () => {
+  try {
+    const base = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:5190'
+    const url = `${String(base).replace(/\/+$/,'')}/api/Usuarios/reportes/${props.reporte.id}`
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${props.token}`, Accept: 'application/json' } })
+    if (!res.ok) return
+    const data = await res.json()
+    const est = pickInt(data, ['estacionId','EstacionId','idEstacion','IdEstacion'])
+    const estd = (pickStr(data, ['estado','Estado']) || '').toUpperCase()
+    if (est != null) assignedStationId.value = est
+    if (estd) estadoActual.value = estd
+  } catch { /* no-op */ }
+})
+const canMitigar = computed(() => {
+  if ((estadoActual.value || '').toUpperCase() !== 'ACEPTADO') return false
+  if (assignedStationId.value == null || myStationId.value == null) return false
+  return assignedStationId.value === myStationId.value
+})
+
+function onClose() { if (!loading.value) emit('close') }
 
 async function onMitigar() {
-  if (loading.value) return;
-  loading.value = true;
-  error.value = '';
+  if (loading.value) return
+  loading.value = true
+  error.value = ''
   try {
-    const r = await mitigarReporte(props.token, props.reporte.id);
-    window.dispatchEvent(new CustomEvent('reporte-mitigado', { detail: { id: r.id } }));
-    emit('mitigado', r.id);
+    const r = await mitigarReporte(props.token, props.reporte.id)
+    window.dispatchEvent(new CustomEvent('reporte-mitigado', { detail: { id: r.id } }))
+    emit('mitigado', r.id)
   } catch (e: any) {
-    error.value = e?.message || 'No se pudo mitigar';
+    error.value = e?.message || 'No se pudo mitigar'
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 

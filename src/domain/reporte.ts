@@ -11,6 +11,7 @@ export interface Reporte {
   usuarioCi?: string;
   usuarioCelular?: string;
   usuarioEmail?: string;
+  estacionId?: number;
   usuario?: {
     nombre?: string;
     apellido?: string;

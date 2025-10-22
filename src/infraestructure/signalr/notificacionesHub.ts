@@ -20,7 +20,7 @@ export async function stopConnection(): Promise<void> {
       connection.off('ReporteEstado');
       connection.off('AsignacionEstado');
       connection.off('ReporteMitigado');
-      connection.off('AsignacionMitigada');
+      connection.off('AsignacionMitigado');
       connection.off('ReporteActualizado');
       connection.off('AsignacionActualizada');
     } catch {}
@@ -39,6 +39,51 @@ export function initNotificaciones(baseUrl: string, token: string) {
   console.log('[SignalR] Creando conexión...', baseUrl);
   const hubUrl = `${baseUrl.replace(/\/+$/, '')}/hubs/notificaciones`;
 
+  const estacionId = getEstacionIdFromToken(token);
+  const shouldNotify = (p: any) => {
+    try {
+      const cand = p?.primeraCandidata ?? p?.PrimeraCandidata ?? p?.estacionId ?? p?.EstacionId;
+      if (typeof cand === 'number') return cand === estacionId;
+      const n = Number(cand);
+      return !isNaN(n) && n === estacionId;
+    } catch { return false; }
+  };
+
+  const api = new URL(baseUrl);
+  const normalizeImageUrl = (raw: any) => {
+    try {
+      if (!raw) return '';
+      const u = new URL(String(raw), api);
+      if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') {
+        u.hostname = api.hostname;
+        u.port = api.port;
+        u.protocol = api.protocol;
+      }
+      return u.toString();
+    } catch {
+      return String(raw ?? '');
+    }
+  };
+  const normalize = (p: any) => {
+    const id = p?.reporteId ?? p?.ReporteId ?? p?.id ?? p?.Id;
+    const foto = p?.fotoUrl ?? p?.imagenUrl ?? p?.FotoUrl ?? p?.ImagenUrl;
+    const fotoN = normalizeImageUrl(foto);
+    return { ...p, id, fotoUrl: fotoN, imagenUrl: fotoN };
+  };
+  const seen = new Map<number, number>();
+  const addOnce = (p: any) => {
+    const id = Number(p?.reporteId ?? p?.ReporteId ?? p?.id ?? p?.Id);
+    if (!Number.isFinite(id)) return true;
+    const now = Date.now();
+    const last = seen.get(id) ?? 0;
+    if (now - last < 1200) { 
+      console.log('[SignalR] Duplicado ignorado id=', id);
+      return false;
+    }
+    seen.set(id, now);
+    return true;
+  };
+
   connection = new signalR.HubConnectionBuilder()
     .withUrl(hubUrl, {
       accessTokenFactory: () => token
@@ -51,31 +96,63 @@ export function initNotificaciones(baseUrl: string, token: string) {
 
   connection.on('ReporteCreado', payload => {
     console.log('[SignalR] ReporteCreado recibido', payload);
-    incomingReportesStore.addReporte(payload);
+    if (!shouldNotify(payload)) { console.log('[SignalR] Ignorado por estación', estacionId); return; }
+    if (!addOnce(payload)) return;                          
+    incomingReportesStore.addReporte(normalize(payload));    
   });
 
   connection.on('ReporteAsignado', payload => {
     console.log('[SignalR] ReporteAsignado recibido', payload);
-    incomingReportesStore.addReporte(payload);
+    if (!shouldNotify(payload)) { console.log('[SignalR] Ignorado por estación', estacionId); return; }
+    if (!addOnce(payload)) return;                           
+    incomingReportesStore.addReporte(normalize(payload));    
   });
 
-  connection.on('ReporteEstado', payload => {
+  connection.on?.('AsignacionCreada' as any, (payload: any) => {
+    console.log('[SignalR] AsignacionCreada', payload);
+    if (!shouldNotify(payload)) { console.log('[SignalR] Ignorado por estación', estacionId); return; }
+    if (!addOnce(payload)) return;                          
+    incomingReportesStore.addReporte(normalize(payload));    
+  });
+
+  connection.on('ReporteEstado', (payload: any) => {
     console.log('[SignalR] ReporteEstado', payload);
-    if ((payload.estado ?? '').toUpperCase() === 'MITIGADO') {
+    const estado = String(payload?.estado ?? '').toUpperCase();
+    const id = payload?.id ?? payload?.Id ?? payload?.reporteId ?? payload?.ReporteId;
+
+    if (estado === 'MITIGADO') {
       window.dispatchEvent(new CustomEvent('reporte-mitigado', { detail: payload }));
+    }
+    if (estado === 'ACEPTADO') {
+      emitAceptado(payload);
     }
   });
 
   connection.on('ReporteReasignado', p => {
     console.log('[SignalR] Reasignado', p);
-    incomingReportesStore.addReporte(p);
+    if (!shouldNotify(p)) { console.log('[SignalR] Ignorado por estación', estacionId); return; }
+    if (!addOnce(p)) return;                                 
+    incomingReportesStore.addReporte(normalize(p));          
   });
 
   ['ReporteRechazado', 'reporterechazado'].forEach(evt => {
     connection!.on(evt, p => {
       console.log('[SignalR] Evento rechazo', evt, p);
-      if (p && (p.latitud || p.Latitud)) {
-        incomingReportesStore.addReporte(p);
+      const candRaw =
+        p?.nuevaCandidata ?? p?.NuevaCandidata ??
+        p?.candidata ?? p?.Candidata ??
+        p?.primeraCandidata ?? p?.PrimeraCandidata;
+      const cand = typeof candRaw === 'number' ? candRaw : Number(candRaw);
+      if (!Number.isFinite(cand) || cand !== estacionId) {
+        console.log('[SignalR] Rechazo ignorado por estación', estacionId);
+        return;
+      }
+      if (!addOnce(p)) return;                               
+      const id = p?.reporteId ?? p?.ReporteId ?? p?.id ?? p?.Id;
+      const normalized = { ...normalize(p), id, primeraCandidata: cand, estado: (p?.estado ?? 'PENDIENTE').toString().toUpperCase() };
+      incomingReportesStore.addReporte(normalized);
+      if (id != null) {
+        window.dispatchEvent(new CustomEvent('reporte-reasignado', { detail: { reporteId: id, nuevaCandidata: cand } }));
       }
     });
   });
@@ -90,6 +167,17 @@ export function initNotificaciones(baseUrl: string, token: string) {
 
   (window as any).__conn = connection;
   return connection;
+}
+
+function getEstacionIdFromToken(token: string): number {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return 0;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    const v = payload.estacion_id ?? payload.estacionId ?? payload.station_id ?? payload.stationId;
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : 0;
+  } catch { return 0; }
 }
 
 export async function startNotificaciones() {
@@ -147,4 +235,14 @@ export async function stop() {
     await connection.stop();
   }
   _lastToken = null;
+}
+
+function emitAceptado(p: any) {
+  try {
+    const id = p?.id ?? p?.Id ?? p?.reporteId ?? p?.ReporteId;
+    if (id != null) {
+      window.dispatchEvent(new CustomEvent('reporte-aceptado', { detail: { id: Number(id), payload: p } }));
+      console.log('[SignalR] emit reporte-aceptado', id);
+    }
+  } catch {}
 }

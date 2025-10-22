@@ -168,28 +168,80 @@ function centrarReporte(r: any) {
   }
 }
 
-function onReporteAceptado(ev: any) {
-  centrarReporte(ev.detail);
+function upsertReporteAceptado(nuevo: Reporte) {
+  const idx = reportesAceptados.value.findIndex(x => x.id === nuevo.id);
+  if (idx >= 0) reportesAceptados.value[idx] = nuevo;
+  else reportesAceptados.value.push(nuevo);
+  dibujarReportes();
+}
 
-  const r = ev?.detail
-  if (r && Number.isFinite(Number(r.latitud)) && Number.isFinite(Number(r.longitud))) {
-    const nuevoId = (r.id ?? r.Id) ?? Date.now();
-    const nuevo: Reporte = {
-      id: Number(nuevoId),
-      descripcion: r.descripcion ?? r.Descripcion,
-      fotoUrl: r.fotoUrl ?? r.FotoUrl,
-      latitud: Number(r.latitud ?? r.Latitud),
-      longitud: Number(r.longitud ?? r.Longitud),
-      estado: (r.estado ?? r.Estado) || 'ACEPTADO',
-      fechaCreacion: r.fechaCreacion ?? r.FechaCreacion,
-    }
-    const idx = reportesAceptados.value.findIndex(x => x.id === nuevo.id);
-    if (idx >= 0) reportesAceptados.value[idx] = nuevo;
-    else reportesAceptados.value.push(nuevo);
-
-    dibujarReportes()
+async function cargarReporteAceptadoPorId(id: number): Promise<Reporte | null> {
+  try {
+    const todos = await getReportes(token);
+    const r = todos.find(x => x.id === id && (String(x.estado || '').toUpperCase() === 'ACEPTADO'));
+    return r ?? null;
+  } catch {
+    return null;
   }
 }
+
+function buildReporteFromPayload(p: any): Reporte | null {
+  if (!p) return null;
+  const id = Number((p.id ?? p.Id ?? p.reporteId ?? p.ReporteId));
+  const lat = Number(p.latitud ?? p.Latitud);
+  const lng = Number(p.longitud ?? p.Longitud);
+  if (!Number.isFinite(id) || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return {
+    id,
+    descripcion: p.descripcion ?? p.Descripcion ?? '',
+    fotoUrl: p.fotoUrl ?? p.FotoUrl ?? '',
+    latitud: lat,
+    longitud: lng,
+    estado: (p.estado ?? p.Estado) || 'ACEPTADO',
+    fechaCreacion: p.fechaCreacion ?? p.FechaCreacion ?? ''
+  };
+}
+
+function getStationIdFromJwt(t: string): number | null {
+  try {
+    const parts = t.split('.');
+    if (parts.length !== 3) return null;
+    const json = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    const v = json.estacion_id ?? json.estacionId ?? json.station_id ?? json.stationId;
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+  } catch { return null; }
+}
+function getAuthToken(): string {
+  return token || localStorage.getItem('token') || '';
+}
+const myStationId = getStationIdFromJwt(getAuthToken());
+
+async function onReporteAceptado(ev: any) {
+  const d = ev?.detail ?? {};
+  const p = d.payload ?? d;
+  const id = Number(d.id ?? p?.id ?? p?.Id ?? p?.reporteId ?? p?.ReporteId);
+  if (!Number.isFinite(id)) return;
+  let rep = buildReporteFromPayload(p);
+  if (!rep) {
+    rep = await cargarReporteAceptadoPorId(id);
+  }
+  if (rep) {
+    upsertReporteAceptado(rep);
+    const cand =
+      Number(p?.estacionId ?? p?.EstacionId ?? p?.primeraCandidata ?? p?.PrimeraCandidata ?? p?.candidata ?? p?.Candidata);
+    const repEst = Number((rep as any)?.idEstacion ?? (rep as any)?.estacionId);
+
+    const isMine =
+      (Number.isFinite(cand) && myStationId != null && cand === myStationId) ||
+      (!Number.isFinite(cand) && Number.isFinite(repEst) && myStationId != null && repEst === myStationId);
+
+    if (isMine) {
+      centrarReporte(rep); 
+    }
+  }
+}
+
 const detalleVisible = ref(false)
 const detalleActual = ref<Reporte | null>(null)
 
@@ -213,19 +265,6 @@ onMounted(async () => {
   initMap();
   await cargar();
   await cargarReportesAceptados();
-
-  try {
-    const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5190').replace(/\/+$/,'');
-    const mod: any = await import('../../../infraestructure/signalr/notificacionesHub');
-    const hub: any = mod.default?.instance ?? mod.default ?? mod.instance ?? mod;
-    const fn = hub.ensureConnected ?? hub.connect ?? hub.EnsureConnected;
-    if (typeof fn === 'function') {
-      if (fn.length >= 2) await fn(API_BASE, token);
-      else await fn({ baseUrl: API_BASE, token });
-    }
-  } catch (e) {
-    console.warn('[MAP] No se pudo reconectar al hub existente:', e);
-  }
 });
 
 onBeforeUnmount(() => {

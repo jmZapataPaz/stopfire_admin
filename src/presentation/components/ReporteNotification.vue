@@ -58,7 +58,7 @@ const TOTAL = 60;
 const timeLeft = ref<number>(TOTAL);
 const ticking = ref<number | null>(null);
 const showTimer = computed(() => store.state.visible && !store.state.aceptado);
-const percent = computed(() => Math.max(0, Math.min(100, ((TOTAL - timeLeft.value) / TOTAL) * 100)));
+const percent = computed(() => Math.max(0, Math.min(100, (timeLeft.value / TOTAL) * 100)));
 
 function startTimer() {
   stopTimer();
