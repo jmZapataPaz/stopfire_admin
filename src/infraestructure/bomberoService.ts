@@ -51,7 +51,26 @@ export async function crearBombero(data: CrearBombero, token: string) {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Error al crear bombero');
+
+  if (!res.ok) {
+    let msg = 'Error al crear bombero';
+    try {
+      const text = await res.text();
+      if (text) {
+        try {
+          const json = JSON.parse(text);
+          msg = json?.mensaje || json?.message || msg;
+        } catch {
+          msg = text || msg;
+        }
+      }
+    } catch {}
+    if (res.status === 409 && (!msg || msg === 'Error al crear bombero')) {
+      msg = 'Ya existe un usuario con ese correo o CI.';
+    }
+    throw new Error(msg);
+  }
+
   return await res.json();
 }
 

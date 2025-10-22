@@ -6,14 +6,42 @@
       {{ mostrarFormulario ? 'Cerrar' : 'Crear Bombero' }}
     </button>
 
-    <form v-if="mostrarFormulario" @submit.prevent="crear">
+    <form v-if="mostrarFormulario" @submit.prevent="crear" novalidate>
       <input v-model="nuevo.nombre" placeholder="Nombre" required />
       <input v-model="nuevo.apellido" placeholder="Apellido" required />
       <input v-model="nuevo.ci" placeholder="CI" required />
-      <input v-model="nuevo.correo" placeholder="Correo" type="email" required />
-      <input v-model="nuevo.celular" placeholder="Celular" required />
-      <input v-model="nuevo.contrasena" placeholder="Contraseña" type="password" required />
-      <button type="submit">Guardar</button>
+
+      <input
+        v-model.trim="nuevo.correo"
+        placeholder="Correo"
+        type="email"
+        required
+      />
+
+      <input
+        v-model="nuevo.celular"
+        placeholder="Celular"
+        inputmode="numeric"
+        pattern="^[0-9]{8,}$"
+        minlength="8"
+        required
+        @input="onCelularInput"
+      />
+      <div style="display:flex; gap:.5rem; align-items:center;">
+        <input
+          :type="mostrarContrasena ? 'text' : 'password'"
+          v-model="nuevo.contrasena"
+          placeholder="Contraseña"
+          required
+        />
+        <button type="button" @click="mostrarContrasena = !mostrarContrasena">
+          {{ mostrarContrasena ? 'Ocultar' : 'Mostrar' }}
+        </button>
+      </div>
+      <button type="submit" class="submit-btn">Guardar</button>
+      <div v-if="crearErrores.length" class="error form-error">
+        <div v-for="(m,i) in crearErrores" :key="i">{{ m }}</div>
+      </div>
     </form>
 
     <table class="table">
@@ -72,10 +100,11 @@ function getCookie(name: string): string | null {
   return null
 }
 const token = getCookie('csrftoken') || ''
-
 const bomberos = ref<Bombero[]>([])
 const error = ref('')
 const mostrarFormulario = ref(false)
+const crearErrores = ref<string[]>([])
+const mostrarContrasena = ref(false)
 
 const nuevo = ref<CrearBombero>({
   nombre: '',
@@ -102,14 +131,55 @@ async function cargarBomberos() {
     return []
   })
 }
+function onCelularInput(e: Event) {
+  const t = e.target as HTMLInputElement
+  const clean = (t.value || '').replace(/\D/g, '')
+  t.value = clean
+  nuevo.value.celular = clean
+}
+function isEmail(val: string) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i
+  return re.test(val)
+}
+function isExampleDomain(email: string) {
+  const m = email.toLowerCase().match(/@([^@]+)$/)
+  if (!m) return false
+  const d = m[1]
+  return d === 'example.com' || d === 'example.net' || d === 'example.org'
+}
+function isPasswordValid(val: string) {
+  return val.length >= 8 && /[A-Z]/.test(val) && /\d/.test(val)
+}
+function isCelularOk(val: string) {
+  return /^\d{8,}$/.test(val)
+}
 
 async function crear() {
+  crearErrores.value = []
   error.value = ''
+  if (!isEmail(nuevo.value.correo)) {
+    crearErrores.value.push('Ingresa un correo válido.')
+  } else if (isExampleDomain(nuevo.value.correo)) {
+    crearErrores.value.push('No se aceptan correos de ejemplo (@example.com, @example.net, @example.org).')
+  }
+  if (!isCelularOk(nuevo.value.celular)) {
+    crearErrores.value.push('El celular debe tener mínimo 8 dígitos.')
+  }
+  if (!isPasswordValid(nuevo.value.contrasena)) {
+    crearErrores.value.push('La contraseña debe tener mínimo 8 caracteres, al menos 1 mayúscula y 1 número.')
+  }
+
+  if (crearErrores.value.length) return
+
   await crearBombero(nuevo.value, token).then(async () => {
     mostrarFormulario.value = false
     await cargarBomberos()
     nuevo.value = { nombre: '', apellido: '', ci: '', correo: '', celular: '', contrasena: '' }
-  }).catch((e) => error.value = e.message || 'Error al crear bombero')
+    crearErrores.value = []
+    mostrarContrasena.value = false
+  }).catch((e) => {
+    crearErrores.value = [e?.message || 'Error al crear bombero']
+  })
 }
 
 function abrirEdicion(b: Bombero) {
@@ -191,8 +261,19 @@ onMounted(cargarBomberos)
   margin-top: 0.5rem;
 }
 .error {
-  color: #ef4444;
+  background: #ef4444;
+  color: #fff;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
   margin-top: 1rem;
+}
+.submit-btn { order: 1; }
+.form-error {
+  order: 2;
+  position: static !important;
+  display: block;
+  width: 100%;
+  margin-top: .5rem;
 }
 form {
   display: flex;
