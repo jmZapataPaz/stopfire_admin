@@ -115,6 +115,13 @@ export function initNotificaciones(baseUrl: string, token: string) {
     incomingReportesStore.addReporte(normalize(payload));    
   });
 
+  // AGREGADO: helper para emitir un evento estándar de estado de reporte
+  function emitReporteEstadoEvent(payload: any) {
+    try {
+      window.dispatchEvent(new CustomEvent('sr-reporte-estado', { detail: payload }));
+    } catch {}
+  }
+
   connection.on('ReporteEstado', (payload: any) => {
     console.log('[SignalR] ReporteEstado', payload);
     const estado = String(payload?.estado ?? '').toUpperCase();
@@ -126,6 +133,13 @@ export function initNotificaciones(baseUrl: string, token: string) {
     if (estado === 'ACEPTADO') {
       emitAceptado(payload);
     }
+  });
+
+  // AGREGADO: algunas instalaciones solo disparan AsignacionCreada al aceptar
+  connection.on('AsignacionCreada', (a: any) => {
+    const id =
+      a?.idReporte ?? a?.IdReporte ?? a?.reporteId ?? a?.ReporteId ?? a?.id ?? a?.Id;
+    emitReporteEstadoEvent({ id, estado: 'ACEPTADO', ...a });
   });
 
   connection.on('ReporteReasignado', p => {
