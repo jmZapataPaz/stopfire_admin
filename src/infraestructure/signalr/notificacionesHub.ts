@@ -115,7 +115,6 @@ export function initNotificaciones(baseUrl: string, token: string) {
     incomingReportesStore.addReporte(normalize(payload));    
   });
 
-  // AGREGADO: helper para emitir un evento estándar de estado de reporte
   function emitReporteEstadoEvent(payload: any) {
     try {
       window.dispatchEvent(new CustomEvent('sr-reporte-estado', { detail: payload }));
