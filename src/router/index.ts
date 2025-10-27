@@ -8,6 +8,7 @@ import BomberosView from '../presentation/views/admin/BomberosView.vue';
 import BomberoMapView from '../presentation/views/bomberos/BomberoMapView.vue';
 import BomberoHistorialView from '../presentation/views/bomberos/BomberoHistorialView.vue';
 import BomberoEstacionView from '../presentation/views/bomberos/BomberoEstacionView.vue';
+import BomberoMetricsView from '../presentation/views/bomberos/BomberoMetricsView.vue';
 
 function getCookie(name: string): string | null {
   const value = `; ${document.cookie}`;
@@ -41,6 +42,11 @@ const routes = [
       { path: 'mapa', name: 'bombero-mapa', component: BomberoMapView },
       { path: 'historial', component: BomberoHistorialView },
       { path: 'estacion', component: BomberoEstacionView },
+      {
+        path: '/bombero/metricas',
+        name: 'bombero-metricas',
+        component: BomberoMetricsView,
+      },
     ]
   }
 ]

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@microsoft/signalr": "^9.0.6",
+    "leaflet.heat": "^0.2.0",
     "vue": "^3.5.18",
     "vue-router": "^4.5.1"
   },

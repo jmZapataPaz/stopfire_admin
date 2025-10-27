@@ -14,6 +14,10 @@
           <span class="icon">📜</span>
           <span class="label">Historial</span>
         </RouterLink>
+        <RouterLink class="nav-link" to="/bombero/metricas">
+          <span class="icon">📊</span>
+          <span class="label">Métricas</span>
+        </RouterLink>
         <RouterLink class="nav-link" to="/bombero/estacion">
           <span class="icon">🏢</span>
           <span class="label">Estación</span>

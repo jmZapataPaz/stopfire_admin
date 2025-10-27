@@ -1,7 +1,7 @@
 <template>
   <div class="bh-container">
     <div class="bh-toolbar">
-      <h3 style="margin:0;">Mi estación</h3>
+      <h3 class="sf-page-title">Mi estación</h3>
       <!-- Botón Recargar eliminado -->
       <span v-if="loading" class="sf-badge">Cargando…</span>
       <span v-if="error" class="bh-badge">{{ error }}</span>

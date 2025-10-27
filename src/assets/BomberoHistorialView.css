@@ -9,3 +9,14 @@
 .bh-badge { display:inline-block; padding: 2px 8px; border-radius: 999px; background:#ffe0e0; color:#b71c1c; font-size: 12px; }
 .bh-footer { margin-top: 8px; color:#777; font-size: 12px; }
 .bh-img { max-width: 90vw; max-height: 80vh; object-fit: contain; display: block; border-radius: 8px; }
+
+/* Forzar estilo del título igual que en Mapa de calor */
+.bh-container .sf-page-title {
+  display: block !important;
+  width: 100% !important;
+  text-align: center !important;
+  margin: 12px auto 18px !important;
+  color: #1976d2 !important;
+  font-weight: 700 !important;
+  font-size: 28px !important;
+}

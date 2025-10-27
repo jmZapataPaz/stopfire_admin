@@ -1,5 +1,6 @@
 <template>
   <div class="bh-container">
+    <h2 class="sf-page-title">Historial de reportes mitigados</h2>
     <div class="bh-toolbar">
       <label>Estación:</label>
       <strong>{{ tituloEstacion }}</strong>
