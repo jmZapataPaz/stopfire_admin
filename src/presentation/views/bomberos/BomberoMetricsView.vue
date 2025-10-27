@@ -2,12 +2,21 @@
   <div class="bombero-metrics">
     <h2 class="sf-page-title">Mapa de calor</h2>
 
-    <div v-if="loading" class="sf-loading">Cargando métricas...</div>
-    <div v-else-if="error" class="sf-error">{{ error }}</div>
-    <div v-else-if="points.length === 0" class="sf-empty">No hay datos para hacer la métrica.</div>
-
-    <div v-else class="metrics-controls">
+    <!-- Controles siempre visibles -->
+    <div class="metrics-controls">
       <div class="controls-row">
+        <label>
+          Mes:
+          <select v-model.number="selectedMonth">
+            <option v-for="(m, i) in months" :key="i" :value="i+1">{{ m }}</option>
+          </select>
+        </label>
+        <label>
+          Año:
+          <select v-model.number="selectedYear">
+            <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
+          </select>
+        </label>
         <label><input type="checkbox" v-model="showLabels" /> Mostrar conteos</label>
         <label><input type="checkbox" v-model="useGradient" /> Gradiente</label>
       </div>
@@ -17,6 +26,10 @@
         </span>
       </div>
     </div>
+
+    <div v-if="loading" class="sf-loading">Cargando métricas...</div>
+    <div v-else-if="error" class="sf-error">{{ error }}</div>
+    <div v-else-if="points.length === 0" class="sf-empty">No hay datos para hacer la métrica.</div>
 
     <!-- Contenedor siempre presente para que el ref exista; se muestra solo si hay puntos -->
     <div ref="mapEl" v-show="points.length > 0" style="height:600px; border-radius:8px;"></div>
@@ -39,6 +52,19 @@ let layersGroup: L.LayerGroup | null = null
 const radiusMultiplier = ref(1.0)
 const showLabels = ref(true)
 const useGradient = ref(true)
+
+// filtros de mes/año (por defecto fecha sistema)
+const dnow = new Date()
+const selectedMonth = ref<number>(dnow.getMonth() + 1)
+const selectedYear = ref<number>(dnow.getFullYear())
+const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+function buildYearsRange(span = 5) {
+  const y = dnow.getFullYear()
+  const arr = []
+  for (let i = 0; i < span; i++) arr.push(y - i)
+  return arr
+}
+const years = buildYearsRange(6)
 
 const legendStops = [
   { label: 'Bajo', color: '#ffeb3b' },
@@ -145,32 +171,32 @@ async function renderMap() {
   setTimeout(() => { try { mapInstance?.invalidateSize() } catch (_) {} }, 200)
 }
 
-onMounted(async () => {
+async function loadMetrics() {
+  loading.value = true
+  error.value = null
   try {
     const token = getCookie('csrftoken')
     if (!token) { error.value = 'No autorizado'; loading.value = false; return }
 
     const base = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:5190'
     const baseUrl = String(base).replace(/\/+$/, '')
-
-    const miEstRes = await fetch(`${baseUrl}/api/Bombero/mi-estacion`, { headers: { Authorization: `Bearer ${token}` } })
+    const url = `${baseUrl}/api/Bombero/mi-estacion`
+    const miEstRes = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
     if (!miEstRes.ok) { error.value = 'No se pudo obtener la estación'; loading.value = false; return }
     const miEst = await miEstRes.json()
     const idEst = miEst?.id ?? miEst?.Id
     if (!idEst) { error.value = 'No tiene estación asignada'; loading.value = false; return }
 
-    console.log('[METRICS] onMounted start')
-    console.log('[METRICS] fetch heatmap URL:', `${baseUrl}/api/Bombero/estaciones/${idEst}/metricas/heatmap`)
-    const res = await fetch(`${baseUrl}/api/Bombero/estaciones/${idEst}/metricas/heatmap`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
-    })
+    const heatUrl = `${baseUrl}/api/Bombero/estaciones/${idEst}/metricas/heatmap?month=${selectedMonth.value}&year=${selectedYear.value}`
+    console.log('[METRICS] fetch heatmap URL:', heatUrl)
+    const res = await fetch(heatUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
     console.log('[METRICS] fetch heatmap status:', res.status)
     if (!res.ok) { error.value = `Error al cargar métricas: ${res.status}`; loading.value = false; return }
     const data = await res.json()
     const pts = data?.points ?? []
     console.log('[METRICS] points raw:', pts)
     await nextTick()
-    points.value = pts 
+    points.value = pts
     await nextTick()
     await renderMap()
   } catch (e: any) {
@@ -179,6 +205,10 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+}
+
+onMounted(async () => {
+  await loadMetrics()
 })
 
 onBeforeUnmount(() => {
@@ -193,6 +223,11 @@ watch([radiusMultiplier, showLabels, useGradient], () => {
   try {
     if (!loading.value && points.value.length > 0) renderMap()
   } catch (e) { /* no-op */ }
+})
+
+// recargar cuando cambian mes/año
+watch([selectedMonth, selectedYear], () => {
+  try { if (!loading.value) loadMetrics() } catch (_) {}
 })
 </script>
 
