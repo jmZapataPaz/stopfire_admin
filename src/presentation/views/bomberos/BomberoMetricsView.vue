@@ -29,10 +29,49 @@
 
     <div v-if="loading" class="sf-loading">Cargando métricas...</div>
     <div v-else-if="error" class="sf-error">{{ error }}</div>
-    <div v-else-if="points.length === 0" class="sf-empty">No hay datos para hacer la métrica.</div>
 
-    <!-- Contenedor siempre presente para que el ref exista; se muestra solo si hay puntos -->
-    <div ref="mapEl" v-show="points.length > 0" style="height:600px; border-radius:8px;"></div>
+    <!-- MANTENER siempre el contenedor del mapa -->
+    <div class="map-wrapper" style="min-height:600px;">
+      <!-- el div del mapa siempre existe (ref) -->
+      <div ref="mapEl" style="height:600px; border-radius:8px;"></div>
+
+      <!-- mensaje encima del mapa cuando no hay puntos -->
+      <div v-if="!loading && points.length === 0" class="sf-empty map-empty">
+        No hay datos para mostrar en el mapa.
+      </div>
+    </div>
+
+    <!-- Contenedor separado, siempre ubicado debajo del mapa -->
+    <div class="response-container">
+      <h2 class="sf-page-title">Tiempo de Respuesta</h2>
+
+      <!-- NUEVO: si no hay puntos, ocultar gráfica y mostrar mensaje -->
+      <div v-if="!loading && points.length === 0" class="sf-empty">
+        No hay datos para mostrar.
+      </div>
+      <div v-else-if="responseData" class="response-time-card" style="padding:12px; background:#fff; border-radius:8px;">
+        <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+          <div style="flex:1 1 600px; max-width:800px; height:320px;">
+            <canvas ref="gaugeCanvas" style="width:100%; height:100%; display:block; background:transparent; border-radius:8px; overflow:visible;"></canvas>
+          </div>
+          <div style="min-width:220px;">
+            <div style="font-size:18px; font-weight:700; margin-bottom:8px;">Promedio: {{ responseData.averageMinutes }} min</div>
+            <div style="margin-bottom:6px;"><strong>Leyenda</strong></div>
+            <ul style="margin:6px 0 0 18px; padding:0; list-style:none;">
+              <li><span style="display:inline-block;width:14px;height:14px;background:#4caf50;margin-right:8px;border-radius:3px;"></span> Verde &lt; 1 min : {{ responseData.distribution.green }}</li>
+              <li><span style="display:inline-block;width:14px;height:14px;background:#ffeb3b;margin-right:8px;border-radius:3px;"></span> Amarillo 1 - &lt;10 min : {{ responseData.distribution.yellow }}</li>
+              <li><span style="display:inline-block;width:14px;height:14px;background:#ff9800;margin-right:8px;border-radius:3px;"></span> Naranja 10 - &lt;21 min : {{ responseData.distribution.orange }}</li>
+              <li><span style="display:inline-block;width:14px;height:14px;background:#d32f2f;margin-right:8px;border-radius:3px;"></span> Rojo &ge; 21 min : {{ responseData.distribution.red }}</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="sf-empty" style="padding:12px; background:#fff7; border-radius:8px;">
+        No hay datos de tiempo de respuesta para el periodo seleccionado.
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -40,6 +79,8 @@
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { Chart, registerables } from 'chart.js'
+Chart.register(...registerables)
 
 const loading = ref(true)
 const error = ref<string | null>(null)
@@ -104,6 +145,147 @@ function interpRgb(a: number[], b: number[], t: number) {
   const g = Math.round(a[1] + (b[1] - a[1]) * t)
   const bl = Math.round(a[2] + (b[2] - a[2]) * t)
   return `rgb(${r},${g},${bl})`
+}
+
+const responseData = ref<any | null>(null)
+const gaugeCanvas = ref<HTMLCanvasElement | null>(null)
+let gaugeChart: Chart | null = null
+
+function drawGauge(data: any) {
+  const canvas = gaugeCanvas.value
+  if (!canvas) return
+  
+  // destruir chart anterior si existe
+  if (gaugeChart) {
+    gaugeChart.destroy()
+    gaugeChart = null
+  }
+
+  const avg = Number(data?.averageMinutes ?? 0)
+  
+  // IMPORTANTE: los 4 segmentos tienen el MISMO tamaño visual (25% cada uno)
+  gaugeChart = new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels: ['Verde < 1 min', 'Amarillo 1-10 min', 'Naranja 10-21 min', 'Rojo ≥ 21 min'],
+      datasets: [{
+        data: [25, 25, 25, 25], // TODOS IGUALES: 25% cada uno
+        backgroundColor: ['#4caf50', '#ffeb3b', '#ff9800', '#d32f2f'],
+        borderWidth: 0,
+        circumference: 180,
+        rotation: 270,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false },
+        title: {
+          display: true,
+          text: `${avg.toFixed(2)} min`,
+          position: 'bottom',
+          font: { size: 18, weight: 'bold' }
+        }
+      }
+    },
+    plugins: [{
+      id: 'needlePlugin',
+      afterDatasetDraw(chart) {
+        const { ctx, chartArea: { width, height } } = chart
+        const cx = width / 2
+        const cy = height
+        
+        // UMBRALES REALES:
+        const thresholds = [
+          { min: 0, max: 1 },      // segmento 0 (verde)
+          { min: 1, max: 10 },     // segmento 1 (amarillo)
+          { min: 10, max: 21 },    // segmento 2 (naranja)
+          { min: 21, max: 60 }     // segmento 3 (rojo)
+        ]
+        
+        let segmentIndex = 0
+        let frac = 0
+        
+        for (let i = 0; i < thresholds.length; i++) {
+          const { min, max } = thresholds[i]
+          const isInSegment = (i === thresholds.length - 1) 
+            ? (avg >= min && avg <= max)
+            : (avg >= min && avg < max)
+          
+          if (isInSegment) {
+            segmentIndex = i
+            frac = (avg - min) / (max - min)
+            break
+          }
+        }
+        
+        if (avg > 60) {
+          segmentIndex = 3
+          frac = 1
+        }
+        
+        // Cada segmento ocupa 25% del semicírculo (180° / 4 = 45°)
+        const segmentAngleDeg = 180 / 4
+        
+        // CORRECCIÓN: Chart.js rota el gráfico 270° (rotation: 270)
+        // Necesitamos COMPENSAR esa rotación en la aguja
+        // El semicírculo visual va de izquierda (-90°) a derecha (90°)
+        // Pero Chart.js lo ha rotado 270°, entonces:
+        // - El verde visual (izquierda) está a 270° - 90° = 180°
+        // - El rojo visual (derecha) está a 270° + 90° = 360° = 0°
+        
+        // Calcular ángulo SIN compensación (como antes)
+        const segmentStartAngle = -90 + segmentIndex * segmentAngleDeg
+        const needleAngleDeg = segmentStartAngle + frac * segmentAngleDeg
+        
+        // APLICAR compensación por la rotación del chart (270°)
+        const compensatedAngleDeg = needleAngleDeg + 270
+        const angleRad = (compensatedAngleDeg * Math.PI) / 180
+        
+        const needleLen = Math.min(width, height) * 0.35
+        
+        // dibujar aguja
+        ctx.save()
+        ctx.translate(cx, cy)
+        ctx.rotate(angleRad)
+        ctx.beginPath()
+        ctx.moveTo(0, 0)
+        ctx.lineTo(needleLen, 0)
+        ctx.lineWidth = 4
+        ctx.strokeStyle = '#111'
+        ctx.lineCap = 'round'
+        ctx.stroke()
+        ctx.restore()
+        
+        // punto central
+        ctx.beginPath()
+        ctx.arc(cx, cy, 8, 0, Math.PI * 2)
+        ctx.fillStyle = '#111'
+        ctx.fill()
+      }
+    }]
+  })
+}
+
+async function loadResponseTime(idEstacion: number) {
+  try {
+    responseData.value = null
+    const token = getCookie('csrftoken')
+    if (!token) return
+    const base = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:5190'
+    const baseUrl = String(base).replace(/\/+$/, '')
+    const url = `${baseUrl}/api/Bombero/estaciones/${idEstacion}/metricas/response-time?month=${selectedMonth.value}&year=${selectedYear.value}`
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
+    if (!res.ok) { console.error('response-time failed', res.status); return }
+    const data = await res.json()
+    responseData.value = data
+    await nextTick()
+    drawGauge(data)
+  } catch (e) {
+    console.error('[RESPONSE-TIME][ERR]', e)
+  }
 }
 
 async function renderMap() {
@@ -199,6 +381,9 @@ async function loadMetrics() {
     points.value = pts
     await nextTick()
     await renderMap()
+
+    // cargar tiempo de respuesta para la misma estación/periodo
+    await loadResponseTime(idEst)
   } catch (e: any) {
     console.error('[METRICS][ERR]', e)
     error.value = String(e)
@@ -209,6 +394,8 @@ async function loadMetrics() {
 
 onMounted(async () => {
   await loadMetrics()
+  // redibujar al cambiar tamaño de ventana
+  window.addEventListener('resize', onResizeWindow)
 })
 
 onBeforeUnmount(() => {
@@ -216,7 +403,20 @@ onBeforeUnmount(() => {
     try { mapInstance.remove() } catch (_) {}
     mapInstance = null
   }
+  if (gaugeChart) {
+    gaugeChart.destroy()
+    gaugeChart = null
+  }
+  window.removeEventListener('resize', onResizeWindow)
 })
+
+function onResizeWindow() {
+  try { 
+    if (gaugeChart && responseData.value) {
+      drawGauge(responseData.value)
+    }
+  } catch (_) {}
+}
 
 import { watch } from 'vue'
 watch([radiusMultiplier, showLabels, useGradient], () => {
@@ -248,5 +448,23 @@ watch([selectedMonth, selectedYear], () => {
 .sf-page-title {
   font-size: 28px !important;
   font-weight: 700 !important;
+}
+
+/* nuevos estilos para separar mapa y tarjeta */
+.map-wrapper { position: relative; }
+.map-empty { position: absolute; top: 16px; left: 16px; z-index: 4000; max-width: calc(100% - 32px); }
+
+.response-container { margin-top: 16px; }
+
+.response-time-card {
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+  overflow: visible !important;
+}
+.response-time-card canvas {
+  display: block;
+  overflow: visible !important;
+  /* garantizar que el canvas use todo el alto del contenedor */
+  width: 100% !important;
+  height: 100% !important;
 }
 </style>
