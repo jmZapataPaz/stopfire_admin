@@ -1,6 +1,7 @@
 <template>
   <div class="bombero-map">
     <div id="bombero-map"></div>
+
     <p v-if="error" class="error">{{ error }}</p>
     <ReporteDetalleModal
       v-if="detalleVisible && detalleActual"
@@ -20,6 +21,7 @@ import type { Estacion } from '../../../domain/estacion'
 import type { Reporte } from '../../../domain/reporte'
 import { getEstacionesBombero } from '../../../infraestructure/estacionBomberoService'
 import { getReportes } from '../../../infraestructure/reporteService'
+import { getHidrantes, type Hidrante } from '../../../infraestructure/hidranteService'
 import '../../../assets/BomberoMapView.css'
 import '../../../assets/ReporteDetalleModal.css'
 import ReporteDetalleModal from '../../components/ReporteDetalleModal.vue'
@@ -27,6 +29,8 @@ import ReporteDetalleModal from '../../components/ReporteDetalleModal.vue'
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
+
+import hidrantePng from '../../../assets/hidrante.png'
 
 const defaultIcon = L.icon({
   iconRetinaUrl: markerIcon2x,
@@ -37,11 +41,22 @@ const defaultIcon = L.icon({
   shadowSize: [41, 41]
 })
 
+// Icono para hidrantes 
+const hidranteIcon = L.icon({
+  iconUrl: hidrantePng,
+  iconSize: [45, 45],   
+  iconAnchor: [12, 24],
+})
+
 const mapRef = ref<L.Map | null>(null)
 const estacionesLayer = ref<L.FeatureGroup | null>(null)
 const reportesLayer = ref<L.FeatureGroup | null>(null)
+const hidrantesLayer = ref<L.FeatureGroup | null>(null)
+
 const estaciones = ref<Estacion[]>([])
 const reportesAceptados = ref<Reporte[]>([])
+const hidrantes = ref<Hidrante[]>([])
+
 const error = ref('')
 
 function getCookie(name: string): string | null {
@@ -75,6 +90,16 @@ async function cargar() {
     error.value = (e.message || 'Error').slice(0, 160)
   }
 }
+
+async function cargarHidrantes() {
+  try {
+    hidrantes.value = await getHidrantes(token)
+    dibujarHidrantes()
+  } catch (e: any) {
+    console.warn('[Hidrantes] carga falló:', e?.message || e)
+  }
+}
+
 async function cargarReportesAceptados() {
   try {
     const todos = await getReportes(token)
@@ -125,6 +150,7 @@ function dibujar() {
     if (b.isValid()) mapRef.value.fitBounds(b, { padding: [30, 30] })
   }
 }
+
 function dibujarReportes() {
   if (!mapRef.value || !reportesLayer.value) return
   reportesLayer.value.clearLayers()
@@ -146,6 +172,27 @@ function dibujarReportes() {
   }
 }
 
+// Dibujar hidrantes siempre que haya datos
+function dibujarHidrantes() {
+  if (!mapRef.value || !hidrantesLayer.value) return
+  hidrantesLayer.value.clearLayers()
+
+  for (const h of hidrantes.value) {
+    const lat = Number(h.latitud)
+    const lng = Number(h.longitud)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
+
+    const marker = L.marker([lat, lng], {
+      icon: hidranteIcon,
+      keyboard: false,
+      title: `Hidrante #${h.id}`
+    })
+
+    marker.bindTooltip(`Hidrante #${h.id}`, { direction: 'top' })
+    marker.addTo(hidrantesLayer.value)
+  }
+}
+
 function initMap() {
   const el = document.getElementById('bombero-map')
   if (!el) return
@@ -158,6 +205,7 @@ function initMap() {
   }).addTo(mapRef.value)
   estacionesLayer.value = L.featureGroup().addTo(mapRef.value)
   reportesLayer.value = L.featureGroup().addTo(mapRef.value)
+  hidrantesLayer.value = L.featureGroup().addTo(mapRef.value)
 }
 
 function centrarReporte(r: any) {
@@ -261,21 +309,19 @@ function onMitigado(id: number) {
 
 onMounted(async () => {
   window.addEventListener('reporte-aceptado', onReporteAceptado);
-  window.addEventListener('reporte-mitigado', onReporteMitigado);
+  window.addEventListener('reporte-mitigado', (ev: any) => {
+    const d = ev?.detail ?? {};
+    const id = Number(d.id ?? d.reporteId ?? d.ReporteId);
+    if (Number.isFinite(id)) onMitigado(id);
+  });
+
   initMap();
   await cargar();
   await cargarReportesAceptados();
-});
+  await cargarHidrantes(); 
+})
 
 onBeforeUnmount(() => {
   window.removeEventListener('reporte-aceptado', onReporteAceptado);
-  window.removeEventListener('reporte-mitigado', onReporteMitigado);
-});
-
-function onReporteMitigado(ev: any) {
-  const id = Number(ev?.detail?.id ?? ev?.detail?.Id);
-  if (!id) return;
-  reportesAceptados.value = reportesAceptados.value.filter(r => r.id !== id);
-  dibujarReportes();
-}
+})
 </script>
