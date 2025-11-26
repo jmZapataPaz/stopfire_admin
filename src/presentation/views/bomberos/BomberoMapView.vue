@@ -1,5 +1,29 @@
 <template>
   <div class="bombero-map">
+    <!-- NUEVO: barra de opciones -->
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:6px;">
+      <label style="display:flex;gap:.35rem;align-items:center;">
+        <input type="checkbox" v-model="mostrarHidrantes" @change="toggleHidrantes" />
+        Mostrar hidrantes
+      </label>
+
+      <label style="display:flex;gap:.35rem;align-items:center;margin-left:8px;">
+        <input type="checkbox" v-model="mostrarMitigados" @change="aplicarFiltroMitigados" />
+        Ver reportes mitigados
+      </label>
+
+      <template v-if="mostrarMitigados">
+        <select v-model="filtroYear" @change="aplicarFiltroMitigados">
+          <option :value="''">Año (todos)</option>
+          <option v-for="y in yearsOpts" :key="y" :value="y">{{ y }}</option>
+        </select>
+        <select v-model="filtroMonth" @change="aplicarFiltroMitigados">
+          <option :value="''">Mes (todos)</option>
+          <option v-for="m in 12" :key="m" :value="m">{{ monthName(m) }}</option>
+        </select>
+      </template>
+    </div>
+
     <div id="bombero-map"></div>
 
     <p v-if="error" class="error">{{ error }}</p>
@@ -31,6 +55,14 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 
 import hidrantePng from '../../../assets/hidrante.png'
+import { getReportesMitigados, type ReporteMitigado } from '../../../infraestructure/reporteService'
+
+const mostrarHidrantes = ref(true)
+const mostrarMitigados = ref(false)
+const filtroYear = ref<number | ''>('')  
+const filtroMonth = ref<number | ''>('') 
+type ReporteMitigadoDto = ReporteMitigado
+const mitigados = ref<ReporteMitigadoDto[]>([])
 
 const defaultIcon = L.icon({
   iconRetinaUrl: markerIcon2x,
@@ -41,7 +73,6 @@ const defaultIcon = L.icon({
   shadowSize: [41, 41]
 })
 
-// Icono para hidrantes 
 const hidranteIcon = L.icon({
   iconUrl: hidrantePng,
   iconSize: [45, 45],   
@@ -52,6 +83,7 @@ const mapRef = ref<L.Map | null>(null)
 const estacionesLayer = ref<L.FeatureGroup | null>(null)
 const reportesLayer = ref<L.FeatureGroup | null>(null)
 const hidrantesLayer = ref<L.FeatureGroup | null>(null)
+const mitigadosLayer = ref<L.FeatureGroup | null>(null)
 
 const estaciones = ref<Estacion[]>([])
 const reportesAceptados = ref<Reporte[]>([])
@@ -95,6 +127,7 @@ async function cargarHidrantes() {
   try {
     hidrantes.value = await getHidrantes(token)
     dibujarHidrantes()
+    toggleHidrantes()
   } catch (e: any) {
     console.warn('[Hidrantes] carga falló:', e?.message || e)
   }
@@ -113,6 +146,45 @@ async function cargarReportesAceptados() {
   }
 }
 
+function toggleHidrantes() {
+  if (!mapRef.value || !hidrantesLayer.value) return
+  try { (mapRef.value as L.Map).removeLayer(hidrantesLayer.value) } catch {}
+  if (mostrarHidrantes.value) {
+    hidrantesLayer.value.addTo(mapRef.value as L.Map)
+  }
+}
+
+async function aplicarFiltroMitigados() {
+  if (!mostrarMitigados.value) {
+    mitigados.value = []
+    if (mitigadosLayer.value && mapRef.value) {
+      mitigadosLayer.value.clearLayers()
+      try { (mapRef.value as L.Map).removeLayer(mitigadosLayer.value) } catch {}
+    }
+    return
+  }
+
+  try {
+    const year = filtroYear.value === '' ? undefined : Number(filtroYear.value)
+    const month = filtroMonth.value === '' ? undefined : Number(filtroMonth.value)
+    mitigados.value = await getReportesMitigados(token, { month, year })
+
+
+    if (mitigadosLayer.value && mapRef.value) {
+      mitigadosLayer.value.addTo(mapRef.value as L.Map)
+      dibujarMitigados()
+    }
+  } catch (e:any) {
+    console.warn('[Mitigados] carga falló:', e?.message || e)
+  }
+}
+
+const currentYear = new Date().getFullYear()
+const yearsOpts = Array.from({ length: 6 }, (_, i) => currentYear - i)
+
+function monthName(m: number) {
+  return ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][m-1]
+}
 function dibujar() {
   if (!mapRef.value || !estacionesLayer.value) return
   estacionesLayer.value.clearLayers()
@@ -172,7 +244,6 @@ function dibujarReportes() {
   }
 }
 
-// Dibujar hidrantes siempre que haya datos
 function dibujarHidrantes() {
   if (!mapRef.value || !hidrantesLayer.value) return
   hidrantesLayer.value.clearLayers()
@@ -187,9 +258,29 @@ function dibujarHidrantes() {
       keyboard: false,
       title: `Hidrante #${h.id}`
     })
-
     marker.bindTooltip(`Hidrante #${h.id}`, { direction: 'top' })
     marker.addTo(hidrantesLayer.value)
+  }
+  toggleHidrantes()
+}
+function dibujarMitigados() {
+  if (!mapRef.value || !mitigadosLayer.value) return
+  mitigadosLayer.value.clearLayers()
+  if (!mostrarMitigados.value) return
+
+  const icon = L.divIcon({
+    className: 'sf-mitigado-marker',
+    html: '✅', 
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  })
+
+  for (const r of mitigados.value) {
+    const lat = Number(r.latitud), lng = Number(r.longitud)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
+    const m = L.marker([lat, lng], { icon, interactive: false })
+    m.bindTooltip(`Mitigado #${r.id}`, { direction: 'top' })
+    m.addTo(mitigadosLayer.value)
   }
 }
 
@@ -206,6 +297,7 @@ function initMap() {
   estacionesLayer.value = L.featureGroup().addTo(mapRef.value)
   reportesLayer.value = L.featureGroup().addTo(mapRef.value)
   hidrantesLayer.value = L.featureGroup().addTo(mapRef.value)
+  mitigadosLayer.value = L.featureGroup().addTo(mapRef.value)
 }
 
 function centrarReporte(r: any) {
@@ -318,10 +410,16 @@ onMounted(async () => {
   initMap();
   await cargar();
   await cargarReportesAceptados();
-  await cargarHidrantes(); 
+  await cargarHidrantes()
+  await aplicarFiltroMitigados()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('reporte-aceptado', onReporteAceptado);
 })
 </script>
+
+<style>
+/* opcional: diferenciar visualmente marcadores mitigados */
+.sf-mitigado-marker { font-size: 18px; line-height: 18px; }
+</style>

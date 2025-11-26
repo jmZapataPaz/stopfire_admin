@@ -45,3 +45,25 @@ export async function mitigarReporte(token: string, id: number): Promise<{ id: n
   const data = text ? JSON.parse(text) : {};
   return { id: data.Id ?? data.id ?? id, estado: data.Estado ?? data.estado ?? 'MITIGADO' };
 }
+
+export interface ReporteMitigado {
+  id: number
+  descripcion: string
+  latitud: number
+  longitud: number
+  fotoUrl?: string | null
+  estado: string
+  fechaCreacion: string
+}
+
+export async function getReportesMitigados(token: string, opts?: { month?: number; year?: number }): Promise<ReporteMitigado[]> {
+  const base = import.meta.env.VITE_API_URL || 'http://localhost:5190'
+  const qs = new URLSearchParams()
+  if (opts?.month) qs.set('month', String(opts.month))
+  if (opts?.year) qs.set('year', String(opts.year))
+  const res = await fetch(`${base}/api/Bombero/reportes/mitigados?${qs.toString()}`, {
+    headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error(`GET mitigados ${res.status}`)
+  return res.json()
+}

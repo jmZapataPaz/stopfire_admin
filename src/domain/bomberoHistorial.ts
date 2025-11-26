@@ -13,5 +13,7 @@ export interface BomberoHistorialItem {
   longitud?: number | null;
   fotoUrl?: string | null;
 
+  direccion?: string | null;
+
   fechaCreacion?: string | null;
 }

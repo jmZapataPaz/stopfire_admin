@@ -60,7 +60,8 @@
       <thead>
         <tr>
           <th>Ciudadano</th><th>CI</th><th>Celular</th>
-          <th>Descripción</th><th>Fecha</th>
+          <th>Descripción</th><th>Dirección</th> <!-- NUEVO -->
+          <th>Fecha</th>
         </tr>
       </thead>
       <tbody>
@@ -77,10 +78,14 @@
             <span v-if="r.descripcion && r.descripcion.trim() !== ''">{{ r.descripcion }}</span>
             <span v-else class="bh-desc-empty">no descripción</span>
           </td>
+          <td>
+            <span v-if="r.direccion && r.direccion.trim() !== ''">{{ r.direccion }}</span>
+            <span v-else class="bh-desc-empty">no hay dirección</span>
+          </td> <!-- NUEVO -->
           <td>{{ formatFecha(r.fechaCreacion) }}</td>
         </tr>
         <tr v-if="!loading && paginatedItems.length === 0">
-          <td colspan="5" class="bh-empty">No hay reportes para los filtros seleccionados.</td>
+          <td colspan="6" class="bh-empty">No hay reportes para los filtros seleccionados.</td>
         </tr>
       </tbody>
     </table>
@@ -222,13 +227,13 @@ function exportPdf() {
       r.ci || '-',
       r.celular || '-',
       (r.descripcion && r.descripcion.trim() !== '') ? r.descripcion : 'no descripción',
+      (r.direccion && r.direccion.trim() !== '') ? r.direccion : 'no hay dirección', // NUEVO
       fecha
     ]
   })
-
   autoTable(doc, {
     startY: 90,
-    head: [[ 'Ciudadano', 'CI', 'Celular', 'Descripción', 'Fecha' ]],
+    head: [[ 'Ciudadano', 'CI', 'Celular', 'Descripción', 'Dirección', 'Fecha' ]], // NUEVO
     body,
     styles: {
       fontSize: 8,
@@ -241,11 +246,12 @@ function exportPdf() {
       fontStyle: 'bold'
     },
     columnStyles: {
-      0: { cellWidth: 120 },
-      1: { cellWidth: 70 },
-      2: { cellWidth: 80 },
-      3: { cellWidth: 230 },
-      4: { cellWidth: 90 }
+      0: { cellWidth: 110 },
+      1: { cellWidth: 60 },
+      2: { cellWidth: 70 },
+      3: { cellWidth: 180 },
+      4: { cellWidth: 160 }, // NUEVO
+      5: { cellWidth: 90 }
     }
   })
 
