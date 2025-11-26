@@ -2,9 +2,18 @@
   <div class="bomberos">
     <h2>Lista de Bomberos</h2>
 
-    <button @click="mostrarFormulario = !mostrarFormulario">
-      {{ mostrarFormulario ? 'Cerrar' : 'Crear Bombero' }}
-    </button>
+    <div class="toolbar" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+      <button @click="mostrarFormulario = !mostrarFormulario">
+        {{ mostrarFormulario ? 'Cerrar' : 'Crear Bombero' }}
+      </button>
+      <!-- NUEVO: filtro por estado -->
+      <label style="margin-left:auto;">Estado:</label>
+      <select v-model="filtroEstado">
+        <option value="todos">Todos</option>
+        <option value="activos">Activos</option>
+        <option value="inactivos">Inactivos</option>
+      </select>
+    </div>
 
     <form v-if="mostrarFormulario" @submit.prevent="crear" novalidate>
       <input v-model="nuevo.nombre" placeholder="Nombre" required />
@@ -52,23 +61,34 @@
           <th>CI</th>
           <th>Correo</th>
           <th>Celular</th>
+          <th>Estado</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="b in bomberos" :key="b.id">
+        <!-- CAMBIO: usar 'paginados' -->
+        <tr v-for="b in paginados" :key="b.id">
           <td>{{ b.nombre }}</td>
           <td>{{ b.apellido }}</td>
           <td>{{ b.ci }}</td>
           <td>{{ b.correo }}</td>
           <td>{{ b.celular }}</td>
+          <td>{{ b.estado ? 'Activo' : 'Inactivo' }}</td>
           <td class="row-actions">
             <button @click="abrirEdicion(b)">Editar</button>
-            <button class="danger" @click="eliminar(b.id)">Eliminar</button>
+            <button v-if="b.estado" class="danger" @click="darDeBaja(b.id)">Dar de baja</button>
+            <button v-else @click="activar(b.id)">Activar</button>
           </td>
         </tr>
       </tbody>
     </table>
+
+    <!-- NUEVO: paginación -->
+    <div class="pagination">
+      <button class="sf-btn" :disabled="currentPage<=1" @click="currentPage=Math.max(1,currentPage-1)">Anterior</button>
+      <span>Página {{ currentPage }} de {{ totalPages }}</span>
+      <button class="sf-btn" :disabled="currentPage>=totalPages" @click="currentPage=Math.min(totalPages,currentPage+1)">Siguiente</button>
+    </div>
 
     <div v-if="editando" class="edit-card">
       <h3>Editar Bombero</h3>
@@ -90,8 +110,8 @@
 
 <script lang="ts" setup>
 import '../../assets/BomberosList.css'
-import { ref, onMounted } from 'vue'
-import { getBomberos, crearBombero, updateBombero, deleteBombero, type Bombero, type CrearBombero } from '../../infraestructure/bomberoService'
+import { ref, onMounted, computed, watch } from 'vue'
+import { getBomberos, crearBombero, updateBombero, /* deleteBombero, */ type Bombero, type CrearBombero, cambiarEstadoBombero } from '../../infraestructure/bomberoService'
 
 function getCookie(name: string): string | null {
   const value = `; ${document.cookie}`
@@ -124,12 +144,33 @@ const editarForm = ref({
   nuevaContrasena: '',
 })
 
+const filtroEstado = ref<'todos'|'activos'|'inactivos'>('todos')
+const listaFiltrada = computed(() => {
+  return bomberos.value.filter(b => {
+    if (filtroEstado.value === 'activos') return b.estado === true
+    if (filtroEstado.value === 'inactivos') return b.estado === false
+    return true
+  })
+})
+
+// NUEVO: paginación (cliente)
+const pageSize = 10
+const currentPage = ref(1)
+const totalPages = computed(() => Math.max(1, Math.ceil(listaFiltrada.value.length / pageSize)))
+const paginados = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return listaFiltrada.value.slice(start, start + pageSize)
+})
+watch([listaFiltrada], () => { currentPage.value = 1 })
+
 async function cargarBomberos() {
   error.value = ''
   bomberos.value = await getBomberos(token).catch((e) => {
     error.value = e.message || 'Error al obtener bomberos'
     return []
   })
+  // NUEVO: resetear página después de cargar
+  currentPage.value = 1
 }
 function onCelularInput(e: Event) {
   const t = e.target as HTMLInputElement
@@ -211,15 +252,18 @@ async function actualizar() {
   }).catch((e) => error.value = e.message || 'Error al actualizar bombero')
 }
 
-async function eliminar(id: number) {
+async function darDeBaja(id: number) { // NUEVO
   error.value = ''
-  const ok = window.confirm('¿Eliminar este bombero?')
-  if (!ok) return
-  await deleteBombero(id, token).then(async () => {
-    await cargarBomberos()
-  }).catch((e) => error.value = e.message || 'Error al eliminar bombero')
+  try { await cambiarEstadoBombero(id, false, token); await cargarBomberos() } 
+  catch (e:any) { error.value = e.message || 'Error al dar de baja' }
+}
+async function activar(id: number) { // NUEVO
+  error.value = ''
+  try { await cambiarEstadoBombero(id, true, token); await cargarBomberos() } 
+  catch (e:any) { error.value = e.message || 'Error al activar' }
 }
 
+// eliminar() -> quitar del UI; backend puede quedar, pero no se muestra
 onMounted(cargarBomberos)
 </script>
 
@@ -243,49 +287,18 @@ onMounted(cargarBomberos)
   color: #334155;
   font-weight: 600;
 }
-.row-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-.edit-card {
-  margin-top: 1rem;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 1rem;
-}
-.actions {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
-  margin-top: 0.5rem;
-}
-.error {
-  background: #ef4444;
-  color: #fff;
-  padding: 0.5rem 0.75rem;
-  border-radius: 8px;
-  margin-top: 1rem;
-}
+.row-actions { display: flex; gap: 0.5rem; }
+.edit-card { margin-top: 1rem; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1rem; }
+.actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem; }
+.error { background: #ef4444; color: #fff; padding: 0.5rem 0.75rem; border-radius: 8px; margin-top: 1rem; }
 .submit-btn { order: 1; }
-.form-error {
-  order: 2;
-  position: static !important;
-  display: block;
-  width: 100%;
-  margin-top: .5rem;
-}
-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin: 1rem 0;
-}
-button {
-  border-radius: 10px;
-}
-button.danger {
-  background: #ef4444;
-  color: #fff;
-}
+.form-error { order: 2; position: static !important; display: block; width: 100%; margin-top: .5rem; }
+form { display: flex; flex-direction: column; gap: 0.5rem; margin: 1rem 0; }
+button { border-radius: 10px; }
+button.danger { background: #ef4444; color: #fff; }
+
+/* NUEVO: paginación */
+.pagination { margin-top: 8px; display: flex; gap: 12px; justify-content: flex-end; align-items: center; }
+.sf-btn { background:#2563eb; color:#fff; border:none; padding:6px 10px; border-radius:4px; }
+.sf-btn:disabled { background:#93c5fd; color:#fff; cursor:not-allowed; }
 </style>

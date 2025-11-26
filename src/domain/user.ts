@@ -6,4 +6,5 @@ export interface User {
   correo: string;
   celular: string;
   rolId: number;
+  ultimoIngreso: Date;
 }

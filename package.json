@@ -12,6 +12,8 @@
     "@microsoft/signalr": "^9.0.6",
     "chart.js": "^4.5.1",
     "chartjs-gauge": "^0.3.0",
+    "jspdf": "^3.0.4",
+    "jspdf-autotable": "^5.0.2",
     "leaflet.heat": "^0.2.0",
     "vue": "^3.5.18",
     "vue-router": "^4.5.1"

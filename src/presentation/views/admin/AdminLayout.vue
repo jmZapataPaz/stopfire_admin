@@ -12,7 +12,7 @@
       <nav>
         <RouterLink class="nav-link" to="/admin/usuarios">
           <span class="icon">👥</span>
-          <span class="label">Usuarios</span>
+          <span class="label">Ciudadanos</span>
         </RouterLink>
         <RouterLink class="nav-link" to="/admin/bomberos">
           <span class="icon">🚒</span>
@@ -21,6 +21,14 @@
         <RouterLink class="nav-link" to="/admin/estaciones">
           <span class="icon">🏢</span>
           <span class="label">Estaciones</span>
+        </RouterLink>
+        <RouterLink class="nav-link" to="/admin/hidrantes">
+          <span class="icon">🚰</span>
+          <span class="label">Hidrantes</span>
+        </RouterLink>
+        <RouterLink class="nav-link" to="/admin/registros-estaciones">
+          <span class="icon">🧾</span>
+          <span class="label">Registro de estaciones</span>
         </RouterLink>
       </nav>
       <button class="logout" @click="logout">
@@ -56,4 +64,4 @@ async function logout() {
   deleteCookie('csrftoken');
   router.push({ name: 'login' });
 }
-</script> 
+</script>

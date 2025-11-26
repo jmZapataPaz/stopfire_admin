@@ -49,7 +49,9 @@
             <td class="row-actions">
               <button @click="centrar(e)">Ver</button>
               <button @click="editar(e)">Editar</button>
-              <button @click="eliminar(e)">Eliminar</button>
+              <!-- Reemplazo: Dar de baja / Activar -->
+              <button v-if="e.estado" @click="darDeBaja(e)">Dar de baja</button>
+              <button v-else @click="activar(e)">Activar</button>
             </td>
           </tr>
         </tbody>
@@ -69,6 +71,7 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { ref, onMounted } from 'vue'
 import { getEstaciones, crearEstacion, updateEstacion, deleteEstacion } from '../../../infraestructure/estacionService'
+import { cambiarEstadoEstacion } from '../../../infraestructure/estacionService'
 import { getBomberos, type Bombero } from '../../../infraestructure/bomberoService'
 import type { Estacion } from '../../../domain/estacion'
 
@@ -164,7 +167,7 @@ async function cargar() {
 
 async function cargarBomberos() {
   const list = await getBomberos(token).catch(() => [])
-  bomberos.value = Array.isArray(list) ? list : []
+  bomberos.value = (Array.isArray(list) ? list : []).filter((b:any) => b.estado !== false) // NUEVO: solo bomberos activos para asignar propietario
 }
 
 function initMap() {
@@ -302,6 +305,28 @@ async function eliminar(e: Estacion) {
   })
 }
 
+async function darDeBaja(e: Estacion) {
+  error.value = ''
+  try {
+    await cambiarEstadoEstacion(e.id, false, token)
+    await cargar()
+    dibujarEstaciones()
+  } catch (err: any) {
+    error.value = err.message || 'Error al dar de baja estación'
+  }
+}
+
+async function activar(e: Estacion) {
+  error.value = ''
+  try {
+    await cambiarEstadoEstacion(e.id, true, token)
+    await cargar()
+    dibujarEstaciones()
+  } catch (err: any) {
+    error.value = err.message || 'Error al activar estación'
+  }
+}
+
 async function onSubmit() {
   error.value = ''
   if (!form.value.nombre || !form.value.descripcionDireccion || !form.value.celular) {
@@ -381,6 +406,7 @@ function dibujarEstaciones() {
   ;(estacionesLayer.value as any).clearLayers()
   stationLayers.value.clear()
   estaciones.value.forEach((e: any) => {
+    if (!e.estado) return // no dibujar inactivas
     const group = L.layerGroup()
     const lat = Number(e.latitud)
     const lng = Number(e.longitud)

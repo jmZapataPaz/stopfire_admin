@@ -10,14 +10,16 @@ function absolutize(u?: any): string | undefined {
   return `${API_BASE}/${s}`;
 }
 
-export interface Bombero {
-  id: number;
-  nombre: string;
-  apellido: string;
-  ci: string;
-  correo: string;
-  celular: string;
-  rolId: number;
+export type Bombero = {
+  id: number
+  nombre: string
+  apellido: string
+  ci: string
+  correo: string
+  celular: string
+  rolId: number
+  ultimoIngreso?: string | null
+  estado: boolean // NUEVO
 }
 
 export interface CrearBombero {
@@ -183,4 +185,17 @@ export async function actualizarEstacionBombero(id: number, data: UpdateEstacion
     celular: d.celular ?? d.Celular,
     estado: true
   } as EstacionDetalle;
+}
+
+export async function cambiarEstadoBombero(id: number, estado: boolean, token: string): Promise<void> {
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5190'
+  const res = await fetch(`${API_BASE}/api/admin/usuarios/bomberos/${id}/estado`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ estado }),
+  })
+  if (!res.ok) throw new Error(await res.text())
 }

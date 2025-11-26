@@ -9,6 +9,7 @@ import BomberoMapView from '../presentation/views/bomberos/BomberoMapView.vue';
 import BomberoHistorialView from '../presentation/views/bomberos/BomberoHistorialView.vue';
 import BomberoEstacionView from '../presentation/views/bomberos/BomberoEstacionView.vue';
 import BomberoMetricsView from '../presentation/views/bomberos/BomberoMetricsView.vue';
+import HidrantesView from '../presentation/views/admin/HidrantesView.vue';
 
 function getCookie(name: string): string | null {
   const value = `; ${document.cookie}`;
@@ -31,7 +32,9 @@ const routes = [
     children: [
       { path: 'estaciones', name: 'admin-estaciones', component: EstacionesView },
       { path: 'usuarios', name: 'admin-usuarios', component: UsuariosView },
-      { path: 'bomberos', name: 'admin-bomberos', component: BomberosView }
+      { path: 'bomberos', name: 'admin-bomberos', component: BomberosView },
+      { path: 'hidrantes', name: 'admin-hidrantes', component: HidrantesView },
+      { path: 'registros-estaciones', component: () => import('../presentation/views/admin/RegistroEstacionesView.vue') },
     ]
   },
   {

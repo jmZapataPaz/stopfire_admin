@@ -42,3 +42,18 @@ export async function deleteEstacion(id: number, token: string): Promise<void> {
   })
   if (!res.ok) throw new Error(await res.text())
 }
+
+export async function cambiarEstadoEstacion(id: number, estado: boolean, token: string): Promise<void> {
+  const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5190'
+  const url = `${base}/api/admin/estaciones/${id}/estado`
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify({ estado })
+  })
+  if (!res.ok) throw new Error(`Error al cambiar estado (${res.status})`)
+}
