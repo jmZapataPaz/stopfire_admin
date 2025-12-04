@@ -52,7 +52,24 @@ async function onSubmit() {
     }
   } catch (e: any) {
     console.error('[Login] Error', e);
-    error.value = (e?.message || 'Error').slice(0, 250);
+    const serverMsg =
+      e?.response?.data?.mensaje ||
+      (() => {
+        const msg = e?.message ?? '';
+        if (typeof msg === 'string') {
+          try {
+            const parsed = JSON.parse(msg);
+            if (parsed && typeof parsed === 'object' && 'mensaje' in parsed) {
+              return String(parsed.mensaje);
+            }
+          } catch {
+          }
+        }
+        return msg;
+      })();
+
+    const clean = typeof serverMsg === 'string' ? serverMsg : 'Error';
+    error.value = clean.slice(0, 250);
   } finally {
     loading.value = false;
   }
