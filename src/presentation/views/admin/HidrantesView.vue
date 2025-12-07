@@ -65,8 +65,27 @@
 <script lang="ts" setup>
 import 'leaflet/dist/leaflet.css'
 import * as L from 'leaflet'
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
+import markerIcon from 'leaflet/dist/images/marker-icon.png'
+import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { ref, onMounted, computed, watch } from 'vue'
 import { getHidrantesAdmin, crearHidranteAdmin, updateHidranteAdmin, cambiarEstadoHidranteAdmin, type HidranteAdmin } from '../../../infraestructure/hidrantesAdminService'
+
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow
+})
+
+const hidranteIcon = L.icon({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+})
 
 function getCookie(name: string): string | null {
   const value = `; ${document.cookie}`
@@ -107,7 +126,10 @@ function destroyMap() {
 function setMarker(lat: number, lng: number, reverse = false) {
   if (!map) return
   if (!marker) {
-    marker = L.marker([lat, lng], { draggable: true }).addTo(map)
+    marker = L.marker([lat, lng], { 
+      draggable: true,
+      icon: hidranteIcon 
+    }).addTo(map)
     marker.on('dragend', () => {
       const ll = marker!.getLatLng()
       form.value.latitud = +ll.lat.toFixed(6)
@@ -132,7 +154,6 @@ async function buscarDireccion() {
     if (!res.ok) return
     const j = await res.json()
     const a = j.address || {}
-    // Priorizar nombre de vía
     const via = a.road || a.pedestrian || a.cycleway || a.footway || a.path || a.neighbourhood
     const localidad = a.suburb || a.village || a.town || a.city
     const texto = [via, localidad].filter(Boolean).join(', ')
@@ -194,7 +215,6 @@ function cancelar() {
   destroyMap()
 }
 
-// Paginación
 const pageSize = 10
 const currentPage = ref(1)
 const totalPages = computed(() => Math.max(1, Math.ceil(hidrantes.value.length / pageSize)))

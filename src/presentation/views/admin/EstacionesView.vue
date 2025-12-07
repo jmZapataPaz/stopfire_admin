@@ -14,7 +14,7 @@
           <input v-model="form.descripcionDireccion" type="text" placeholder="Descripción dirección" required />
           <select v-model="form.idUsuario" required>
             <option value="" disabled>Selecciona propietario</option>
-            <option v-for="b in bomberos" :key="b.id" :value="b.id">{{ b.nombre }} {{ b.apellido }}</option>
+            <option v-for="b in bomberosDisponibles" :key="b.id" :value="b.id">{{ b.nombre }} {{ b.apellido }}</option>
           </select>
           <input v-model="form.celular" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="Celular" required @input="onlyDigits" />
           <label>
@@ -69,7 +69,7 @@ import 'leaflet-draw'
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { getEstaciones, crearEstacion, updateEstacion, deleteEstacion } from '../../../infraestructure/estacionService'
 import { cambiarEstadoEstacion } from '../../../infraestructure/estacionService'
 import { getBomberos, type Bombero } from '../../../infraestructure/bomberoService'
@@ -105,6 +105,7 @@ const pinIcon = L.divIcon({ className: 'station-marker', html: '<span class="m">
 
 const estaciones = ref<Estacion[]>([])
 const bomberos = ref<Bombero[]>([])
+const bomberosCompleto = ref<Bombero[]>([])
 const error = ref('')
 const showForm = ref(false)
 const editId = ref<number | null>(null)
@@ -118,6 +119,13 @@ const form = ref({
   idUsuario: '' as number | ''
 })
 const coberturaGeoJson = ref<any | null>(null)
+const bomberosDisponibles = computed(() => {
+  return bomberosCompleto.value.filter((b: Bombero) => {
+    if (!b.estado) return false
+    if (editId.value && form.value.idUsuario === b.id) return true
+    return !b.tieneEstacionAsignada
+  })
+})
 
 const polygonStyle: L.PathOptions = { color: '#1d4ed8', weight: 2, fillColor: '#60a5fa', fillOpacity: 0.25 }
 function colorForOwner(id: any) {
@@ -167,7 +175,8 @@ async function cargar() {
 
 async function cargarBomberos() {
   const list = await getBomberos(token).catch(() => [])
-  bomberos.value = (Array.isArray(list) ? list : []).filter((b:any) => b.estado !== false) // NUEVO: solo bomberos activos para asignar propietario
+  bomberosCompleto.value = Array.isArray(list) ? list : []
+  bomberos.value = bomberosCompleto.value.filter((b:any) => b.estado !== false)
 }
 
 function initMap() {
@@ -363,6 +372,7 @@ async function onSubmit() {
     }
     await crearEstacion(body, token).then(async () => {
       await cargar()
+      await cargarBomberos() 
       resetForm()
       showForm.value = false
       dibujarEstaciones()
@@ -380,6 +390,7 @@ async function onSubmit() {
     if (coberturaObj) body.coberturaGeoJson = coberturaObj
     await updateEstacion(editId.value, body, token).then(async () => {
       await cargar()
+      await cargarBomberos()
       if (hiddenEditedLayer.value && estacionesLayer.value) {
         hiddenEditedLayer.value.addTo(estacionesLayer.value as any)
         hiddenEditedLayer.value = null
@@ -406,7 +417,7 @@ function dibujarEstaciones() {
   ;(estacionesLayer.value as any).clearLayers()
   stationLayers.value.clear()
   estaciones.value.forEach((e: any) => {
-    if (!e.estado) return // no dibujar inactivas
+    if (!e.estado) return 
     const group = L.layerGroup()
     const lat = Number(e.latitud)
     const lng = Number(e.longitud)
@@ -440,7 +451,7 @@ function onlyDigits(e: Event) {
 
 function propietarioNombre(id: any): string {
   const n = Number(id)
-  const b = bomberos.value.find(x => x.id === n)
+  const b = bomberosCompleto.value.find(x => x.id === n)
   return b ? `${b.nombre} ${b.apellido}`.trim() : '—'
 }
 

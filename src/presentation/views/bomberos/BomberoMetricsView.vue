@@ -18,7 +18,6 @@
           </select>
         </label>
         <label><input type="checkbox" v-model="showLabels" /> Mostrar conteos</label>
-        <label><input type="checkbox" v-model="useGradient" /> Gradiente</label>
       </div>
       <div class="legend">
         <span class="legend-item" v-for="c in legendStops" :key="c.label">
@@ -92,9 +91,7 @@ let layersGroup: L.LayerGroup | null = null
 
 const radiusMultiplier = ref(1.0)
 const showLabels = ref(true)
-const useGradient = ref(true)
 
-// filtros de mes/año (por defecto fecha sistema)
 const dnow = new Date()
 const selectedMonth = ref<number>(dnow.getMonth() + 1)
 const selectedYear = ref<number>(dnow.getFullYear())
@@ -109,7 +106,7 @@ const years = buildYearsRange(6)
 
 const legendStops = [
   { label: 'Bajo', color: '#ffeb3b' },
-  { label: 'Medio', color: '#ff9800' },
+  { label: 'Moderado', color: '#ff9800' },
   { label: 'Alto', color: '#d32f2f' },
 ]
 
@@ -127,24 +124,26 @@ function pickNum(o: any, candidates: string[]) {
   }
   return null
 }
-
-function colorBetween(t: number) {
-  const c1 = [255, 235, 59] // yellow #ffeb3b
-  const c2 = [255, 152, 0]  // orange #ff9800
-  const c3 = [211, 47, 47]  // red #d32f2f
-  if (t < 0.5) {
-    const u = t / 0.5
-    return interpRgb(c1, c2, u)
-  } else {
-    const u = (t - 0.5) / 0.5
-    return interpRgb(c2, c3, u)
+function getColorByCount(count: number): string {
+  if (count >= 1 && count <= 9) {
+    return '#ffeb3b' // Amarillo (Bajo)
+  } else if (count >= 10 && count <= 20) {
+    return '#ff9800' // Naranja (Moderado)
+  } else if (count >= 21) {
+    return '#d32f2f' // Rojo (Alto)
   }
+  return '#ffeb3b' // Por defecto amarillo
 }
-function interpRgb(a: number[], b: number[], t: number) {
-  const r = Math.round(a[0] + (b[0] - a[0]) * t)
-  const g = Math.round(a[1] + (b[1] - a[1]) * t)
-  const bl = Math.round(a[2] + (b[2] - a[2]) * t)
-  return `rgb(${r},${g},${bl})`
+function getOpacityByCount(count: number): number {
+  if (count >= 1 && count <= 9) {
+    return 0.3 + ((count - 1) / 8) * 0.2
+  } else if (count >= 10 && count <= 20) {
+    return 0.5 + ((count - 10) / 10) * 0.2
+  } else if (count >= 21) {
+    const normalized = Math.min((count - 21) / 30, 1) // normalizar hasta 51
+    return 0.7 + normalized * 0.15
+  }
+  return 0.3
 }
 
 const responseData = ref<any | null>(null)
@@ -154,22 +153,18 @@ let gaugeChart: Chart | null = null
 function drawGauge(data: any) {
   const canvas = gaugeCanvas.value
   if (!canvas) return
-  
-  // destruir chart anterior si existe
   if (gaugeChart) {
     gaugeChart.destroy()
     gaugeChart = null
   }
 
   const avg = Number(data?.averageMinutes ?? 0)
-  
-  // IMPORTANTE: los 4 segmentos tienen el MISMO tamaño visual (25% cada uno)
   gaugeChart = new Chart(canvas, {
     type: 'doughnut',
     data: {
       labels: ['Verde < 1 min', 'Amarillo 1-10 min', 'Naranja 10-21 min', 'Rojo ≥ 21 min'],
       datasets: [{
-        data: [25, 25, 25, 25], // TODOS IGUALES: 25% cada uno
+        data: [25, 25, 25, 25], 
         backgroundColor: ['#4caf50', '#ffeb3b', '#ff9800', '#d32f2f'],
         borderWidth: 0,
         circumference: 180,
@@ -196,13 +191,11 @@ function drawGauge(data: any) {
         const { ctx, chartArea: { width, height } } = chart
         const cx = width / 2
         const cy = height
-        
-        // UMBRALES REALES:
         const thresholds = [
-          { min: 0, max: 1 },      // segmento 0 (verde)
-          { min: 1, max: 10 },     // segmento 1 (amarillo)
-          { min: 10, max: 21 },    // segmento 2 (naranja)
-          { min: 21, max: 60 }     // segmento 3 (rojo)
+          { min: 0, max: 1 },      
+          { min: 1, max: 10 },     
+          { min: 10, max: 21 },    
+          { min: 21, max: 60 }     
         ]
         
         let segmentIndex = 0
@@ -225,28 +218,12 @@ function drawGauge(data: any) {
           segmentIndex = 3
           frac = 1
         }
-        
-        // Cada segmento ocupa 25% del semicírculo (180° / 4 = 45°)
         const segmentAngleDeg = 180 / 4
-        
-        // CORRECCIÓN: Chart.js rota el gráfico 270° (rotation: 270)
-        // Necesitamos COMPENSAR esa rotación en la aguja
-        // El semicírculo visual va de izquierda (-90°) a derecha (90°)
-        // Pero Chart.js lo ha rotado 270°, entonces:
-        // - El verde visual (izquierda) está a 270° - 90° = 180°
-        // - El rojo visual (derecha) está a 270° + 90° = 360° = 0°
-        
-        // Calcular ángulo SIN compensación (como antes)
         const segmentStartAngle = -90 + segmentIndex * segmentAngleDeg
         const needleAngleDeg = segmentStartAngle + frac * segmentAngleDeg
-        
-        // APLICAR compensación por la rotación del chart (270°)
         const compensatedAngleDeg = needleAngleDeg + 270
         const angleRad = (compensatedAngleDeg * Math.PI) / 180
-        
         const needleLen = Math.min(width, height) * 0.35
-        
-        // dibujar aguja
         ctx.save()
         ctx.translate(cx, cy)
         ctx.rotate(angleRad)
@@ -325,15 +302,13 @@ async function renderMap() {
 
   if (points.value.length === 0) return
 
-  const maxCount = Math.max(...points.value.map((p:any) => Number(p.count) || 1))
   for (const p of points.value) {
-    const weight = Math.max(1, Number(p.count) || 1)
+    const count = Math.max(1, Number(p.count) || 1)
     const backendRadius = pickNum(p, ['RadiusMeters','radiusMeters','radius'])
-    const baseRadius = Number.isFinite(backendRadius) ? backendRadius : (150 + Math.sqrt(weight) * 120)
+    const baseRadius = Number.isFinite(backendRadius) ? backendRadius : (150 + Math.sqrt(count) * 120)
     const radius = baseRadius! * radiusMultiplier.value
-    const t = Math.min(1, (weight - 1) / Math.max(1, maxCount - 1)) 
-    const fillColor = useGradient.value ? colorBetween(t) : 'rgb(211,47,47)'
-    const opacity = 0.15 + 0.6 * t
+    const fillColor = getColorByCount(count)
+    const opacity = getOpacityByCount(count)
 
     const c = L.circle([p.lat, p.lon], {
       radius,
@@ -345,7 +320,7 @@ async function renderMap() {
 
     if (showLabels.value) {
       L.marker([p.lat, p.lon], { interactive: false, opacity: 0 })
-        .bindTooltip(String(p.count), { permanent: true, direction: 'center', className: 'heat-count' })
+        .bindTooltip(String(count), { permanent: true, direction: 'center', className: 'heat-count' })
         .addTo(layersGroup)
     }
   }
@@ -381,8 +356,6 @@ async function loadMetrics() {
     points.value = pts
     await nextTick()
     await renderMap()
-
-    // cargar tiempo de respuesta para la misma estación/periodo
     await loadResponseTime(idEst)
   } catch (e: any) {
     console.error('[METRICS][ERR]', e)
@@ -394,7 +367,6 @@ async function loadMetrics() {
 
 onMounted(async () => {
   await loadMetrics()
-  // redibujar al cambiar tamaño de ventana
   window.addEventListener('resize', onResizeWindow)
 })
 
@@ -419,13 +391,12 @@ function onResizeWindow() {
 }
 
 import { watch } from 'vue'
-watch([radiusMultiplier, showLabels, useGradient], () => {
+watch([radiusMultiplier, showLabels], () => {
   try {
     if (!loading.value && points.value.length > 0) renderMap()
   } catch (e) { /* no-op */ }
 })
 
-// recargar cuando cambian mes/año
 watch([selectedMonth, selectedYear], () => {
   try { if (!loading.value) loadMetrics() } catch (_) {}
 })
@@ -444,13 +415,11 @@ watch([selectedMonth, selectedYear], () => {
 .legend-item { display:inline-flex; align-items:center; gap:6px; margin-right:12px; color:#333 }
 .legend-item i { width:18px; height:12px; display:inline-block; border-radius:3px; border:1px solid rgba(0,0,0,0.06) }
 
-/* APLICADO: tamaño del título igual a 28px */
 .sf-page-title {
   font-size: 28px !important;
   font-weight: 700 !important;
 }
 
-/* nuevos estilos para separar mapa y tarjeta */
 .map-wrapper { position: relative; }
 .map-empty { position: absolute; top: 16px; left: 16px; z-index: 4000; max-width: calc(100% - 32px); }
 
@@ -463,7 +432,6 @@ watch([selectedMonth, selectedYear], () => {
 .response-time-card canvas {
   display: block;
   overflow: visible !important;
-  /* garantizar que el canvas use todo el alto del contenedor */
   width: 100% !important;
   height: 100% !important;
 }

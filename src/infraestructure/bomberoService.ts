@@ -19,7 +19,8 @@ export type Bombero = {
   celular: string
   rolId: number
   ultimoIngreso?: string | null
-  estado: boolean // NUEVO
+  estado: boolean
+  tieneEstacionAsignada?: boolean
 }
 
 export interface CrearBombero {
@@ -121,7 +122,7 @@ export async function getHistorialAceptadosPorEstacion(token: string, idEstacion
     longitud: Number(r.longitud ?? r.Longitud),
     fotoUrl: r.fotoUrl ?? r.FotoUrl,
     fechaCreacion: (r.fechaCreacion ?? r.FechaCreacion)?.toString(),
-    direccion: r.direccion ?? null, // NUEVO
+    direccion: r.direccion ?? null, 
   })) as BomberoHistorialItem[];
 }
 
